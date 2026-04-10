@@ -65,6 +65,7 @@ class _ChatViewState extends State<_ChatView> {
     if (text.isEmpty) return;
 
     final selectionState = context.read<PaperSelectionCubit>().state;
+    if (!selectionState.allPapersReady) return;
     context.read<ChatCubit>().sendMessage(text, selectionState.paperTitles);
     _inputController.clear();
     setState(() => _showSlashOverlay = false);
@@ -87,6 +88,7 @@ class _ChatViewState extends State<_ChatView> {
   Widget build(BuildContext context) {
     return BlocBuilder<PaperSelectionCubit, PaperSelectionState>(
       builder: (context, selState) {
+        final papersReady = selState.allPapersReady;
         return Scaffold(
           appBar: AppBar(
             title: Text(
@@ -125,6 +127,18 @@ class _ChatViewState extends State<_ChatView> {
           ),
           body: Column(
             children: [
+              if (!papersReady && selState.selectedPapers.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  child: Text(
+                    selState.hasProcessingPapers
+                        ? 'Selected papers are still being indexed. Chat will unlock when processing finishes.'
+                        : (selState.error ?? 'One or more selected papers failed to index. Remove them and try again.'),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
               Expanded(child: _buildMessageList(context)),
               if (_showSlashOverlay)
                 Padding(
@@ -228,6 +242,8 @@ class _ChatViewState extends State<_ChatView> {
     return BlocBuilder<ChatCubit, ChatState>(
       builder: (context, state) {
         final isProcessing = state is ChatSessionLoaded && state.isProcessing;
+        final selectionState = context.watch<PaperSelectionCubit>().state;
+        final inputEnabled = !isProcessing && selectionState.allPapersReady;
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(8),
@@ -237,12 +253,14 @@ class _ChatViewState extends State<_ChatView> {
                   child: TextField(
                     controller: _inputController,
                     onChanged: _onTextChanged,
-                    enabled: !isProcessing,
+                    enabled: inputEnabled,
                     maxLines: null,
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => _sendMessage(context),
                     decoration: InputDecoration(
-                      hintText: 'Ask a question or type / for commands…',
+                      hintText: selectionState.allPapersReady
+                          ? 'Ask a question or type / for commands…'
+                          : 'Wait for paper indexing to finish…',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                       ),
@@ -253,7 +271,7 @@ class _ChatViewState extends State<_ChatView> {
                 ),
                 const SizedBox(width: 8),
                 FloatingActionButton.small(
-                  onPressed: isProcessing ? null : () => _sendMessage(context),
+                  onPressed: inputEnabled ? () => _sendMessage(context) : null,
                   child: isProcessing
                       ? const SizedBox(
                           width: 18,

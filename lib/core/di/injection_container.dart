@@ -59,6 +59,6 @@ Future<void> initDependencies() async {
       ));
 
   // ── Global cubits (singletons) ─────────────────────────────────────────────
-  sl.registerLazySingleton(() => PaperSelectionCubit());
+  sl.registerLazySingleton(() => PaperSelectionCubit(sl<PaperRepository>()));
   sl.registerLazySingleton(() => SettingsCubit(sl<SettingsLocalDatasource>()));
 }

@@ -19,6 +19,9 @@ class PaperCardWidget extends StatelessWidget {
       builder: (context, selectionState) {
         final isSelected = selectionState.isSelected(paper.arxivId);
         final canAdd = selectionState.canAddMore;
+        final status = selectionState.statusFor(paper.arxivId);
+        final isProcessing = status == 'processing';
+        final hasFailed = status == 'failed';
 
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -102,7 +105,13 @@ class PaperCardWidget extends StatelessWidget {
                                 .read<PaperSelectionCubit>()
                                 .removePaper(paper.arxivId),
                             icon: const Icon(Icons.remove_circle_outline, size: 16),
-                            label: const Text('Remove'),
+                            label: Text(
+                              isProcessing
+                                  ? 'Indexing...'
+                                  : hasFailed
+                                      ? 'Remove Failed'
+                                      : 'Remove',
+                            ),
                           )
                         : FilledButton.icon(
                             onPressed: canAdd

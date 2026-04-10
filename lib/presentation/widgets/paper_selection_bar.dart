@@ -29,28 +29,60 @@ class PaperSelectionBar extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: state.selectedPapers.map((paper) {
-                      return Chip(
-                        label: Text(
-                          paper.title.length > 30
-                              ? '${paper.title.substring(0, 30)}…'
-                              : paper.title,
-                          style: const TextStyle(fontSize: 11),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: state.selectedPapers.map((paper) {
+                          final status = state.statusFor(paper.arxivId);
+                          final suffix = switch (status) {
+                            'processing' => ' (indexing)',
+                            'failed' => ' (failed)',
+                            _ => '',
+                          };
+
+                          return Chip(
+                            label: Text(
+                              '${paper.title.length > 24 ? '${paper.title.substring(0, 24)}…' : paper.title}$suffix',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            onDeleted: () =>
+                                context.read<PaperSelectionCubit>().removePaper(paper.arxivId),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            padding: EdgeInsets.zero,
+                          );
+                        }).toList(),
+                      ),
+                      if (state.hasProcessingPapers)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Preparing papers for chat...',
+                            style: TextStyle(fontSize: 11),
+                          ),
                         ),
-                        onDeleted: () =>
-                            context.read<PaperSelectionCubit>().removePaper(paper.arxivId),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        padding: EdgeInsets.zero,
-                      );
-                    }).toList(),
+                      if (state.error != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            state.error!,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),
                 FilledButton.icon(
-                  onPressed: () => Navigator.pushNamed(context, AppRoutes.chat),
+                  onPressed: state.allPapersReady
+                      ? () => Navigator.pushNamed(context, AppRoutes.chat)
+                      : null,
                   icon: const Icon(Icons.chat, size: 18),
                   label: Text('Chat (${state.selectedPapers.length})'),
                 ),

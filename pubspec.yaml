@@ -39,6 +39,7 @@ dependencies:
   # UI
   google_fonts: ^6.2.1
   shimmer: ^3.0.0
+  flutter_markdown: ^0.7.3
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
