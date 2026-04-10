@@ -7,6 +7,7 @@ import '../../cubits/paper_selection/paper_selection_cubit.dart';
 import '../../cubits/paper_selection/paper_selection_state.dart';
 import 'widgets/message_bubble.dart';
 import 'widgets/slash_command_overlay.dart';
+import '../chat_history/chat_history_page.dart';
 
 class ChatPage extends StatelessWidget {
   /// If non-null, the chat page will resume this session from Hive instead of
@@ -83,6 +84,16 @@ class _ChatViewState extends State<_ChatView> {
     _scrollToBottom();
   }
 
+  Future<void> _openHistory(BuildContext context) async {
+    final sessionId = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const ChatHistoryPage()),
+    );
+    if (sessionId != null && context.mounted) {
+      context.read<ChatCubit>().loadSession(sessionId);
+    }
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -107,6 +118,13 @@ class _ChatViewState extends State<_ChatView> {
                   ? 'Chat'
                   : '${selState.selectedPapers.length} paper${selState.selectedPapers.length > 1 ? 's' : ''} selected',
             ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.history),
+                tooltip: 'Chat History',
+                onPressed: () => _openHistory(context),
+              ),
+            ],
             bottom: selState.selectedPapers.isNotEmpty
                 ? PreferredSize(
                     preferredSize: const Size.fromHeight(32),

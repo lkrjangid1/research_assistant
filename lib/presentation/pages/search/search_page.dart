@@ -9,6 +9,7 @@ import '../../widgets/loading_overlay.dart';
 import 'widgets/search_bar_widget.dart';
 import 'widgets/paper_card_widget.dart';
 import '../../../app/routes.dart';
+import '../chat_history/chat_history_page.dart';
 
 class SearchPage extends StatelessWidget {
   const SearchPage({super.key});
@@ -60,8 +61,20 @@ class _SearchViewState extends State<_SearchView> {
           IconButton(
             icon: const Icon(Icons.history),
             tooltip: 'Chat History',
-            onPressed: () =>
-                Navigator.pushNamed(context, AppRoutes.chatHistory),
+            onPressed: () async {
+              final sessionId = await Navigator.push<String>(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const ChatHistoryPage()),
+              );
+              if (sessionId != null && context.mounted) {
+                Navigator.pushNamed(
+                  context,
+                  AppRoutes.chat,
+                  arguments: ChatRouteArgs(sessionId: sessionId),
+                );
+              }
+            },
           ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),

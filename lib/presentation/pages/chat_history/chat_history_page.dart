@@ -5,7 +5,6 @@ import '../../../core/utils/date_formatter.dart';
 import '../../../domain/entities/chat_session.dart';
 import '../../cubits/chat_history/chat_history_cubit.dart';
 import '../../cubits/chat_history/chat_history_state.dart';
-import '../../../app/routes.dart';
 
 class ChatHistoryPage extends StatelessWidget {
   const ChatHistoryPage({super.key});
@@ -171,10 +170,8 @@ class _SessionTile extends StatelessWidget {
   }
 
   void _resumeSession(BuildContext context) {
-    Navigator.pushNamed(
-      context,
-      AppRoutes.chat,
-      arguments: ChatRouteArgs(sessionId: session.sessionId),
-    );
+    // Pop with the sessionId so the caller (ChatPage or SearchPage) decides
+    // whether to load in-place or push a new ChatPage.
+    Navigator.pop(context, session.sessionId);
   }
 }
