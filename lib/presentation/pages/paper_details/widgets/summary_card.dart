@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../cubits/paper_details/paper_details_cubit.dart';
 import '../../../cubits/paper_details/paper_details_state.dart';
 
@@ -43,7 +44,13 @@ class SummaryCard extends StatelessWidget {
                     ),
                   )
                 else if (state.summary != null) ...[
-                  Text(state.summary!, style: Theme.of(context).textTheme.bodyMedium),
+                  MarkdownBody(
+                    data: state.summary!,
+                    styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                      p: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    shrinkWrap: true,
+                  ),
                   if (state.keyPoints.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text('Key Points',
