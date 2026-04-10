@@ -1,5 +1,7 @@
 import 'package:hive/hive.dart';
 import '../../../core/constants/hive_keys.dart';
+import '../../models/chat_session_model.dart';
+import '../../models/paper_model.dart';
 
 class SettingsLocalDatasource {
   Box get _box => Hive.box(HiveKeys.settingsBox);
@@ -18,9 +20,7 @@ class SettingsLocalDatasource {
 
   Future<void> clearAllData() async {
     await _box.clear();
-    final chatBox = Hive.box(HiveKeys.chatSessionsBox);
-    await chatBox.clear();
-    final papersBox = Hive.box(HiveKeys.papersBox);
-    await papersBox.clear();
+    await Hive.box<ChatSessionModel>(HiveKeys.chatSessionsBox).clear();
+    await Hive.box<PaperModel>(HiveKeys.papersBox).clear();
   }
 }

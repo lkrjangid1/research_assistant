@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../cubits/settings/settings_cubit.dart';
 import '../../cubits/settings/settings_state.dart';
+import '../../cubits/paper_selection/paper_selection_cubit.dart';
+import '../../../app/routes.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -104,7 +106,27 @@ class SettingsPage extends StatelessWidget {
       ),
     );
     if (confirmed == true && context.mounted) {
+      // Clear Hive data + reset settings state
       await context.read<SettingsCubit>().clearAllData();
+
+      if (!context.mounted) return;
+
+      // Reset in-memory paper selection so the UI reflects the cleared state
+      context.read<PaperSelectionCubit>().clearAll();
+
+      // Pop the entire navigation stack back to the search root so no page
+      // (chat, paper details, etc.) holds stale in-memory state
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppRoutes.search,
+        (route) => false,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('All data cleared'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 }
