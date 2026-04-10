@@ -2,7 +2,7 @@ class ApiConstants {
   static const String arxivBaseUrl = 'https://export.arxiv.org/api/query';
   static const String backendBaseUrl = String.fromEnvironment(
     'BACKEND_URL',
-    defaultValue: 'http://10.0.2.2:8000',
+    defaultValue: 'https://research-assistant-9p0m.onrender.com',
   );
   static const String chatQuery = '/api/chat/query';
   static const String chatCommand = '/api/chat/command';
