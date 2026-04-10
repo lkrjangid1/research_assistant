@@ -1,49 +1,72 @@
-import asyncio
 import logging
+
+import httpx
 import numpy as np
+
 from app.core.exceptions import EmbeddingError
 
 logger = logging.getLogger(__name__)
 
-BATCH_SIZE = 250  # Vertex AI batch limit
+_EMBEDDING_API_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/{model}:embedContent"
+)
 
 
 class EmbeddingService:
-    """Generate embeddings using Vertex AI text-embedding-004 (768-dim)."""
+    """Generate embeddings using the Gemini embedding API."""
 
-    def __init__(self, project_id: str, location: str, model_name: str = "text-embedding-004"):
-        self.project_id = project_id
-        self.location = location
+    def __init__(
+        self,
+        api_key: str,
+        model_name: str = "gemini-embedding-001",
+        embedding_dim: int = 768,
+    ):
+        self.api_key = api_key
         self.model_name = model_name
-        self.embedding_dim = 768
-        self._model = None
-
-    def _get_model(self):
-        if self._model is None:
-            from google.cloud import aiplatform
-            from vertexai.language_models import TextEmbeddingModel
-            aiplatform.init(project=self.project_id, location=self.location)
-            self._model = TextEmbeddingModel.from_pretrained(self.model_name)
-        return self._model
+        self.embedding_dim = embedding_dim
 
     async def embed_texts(self, texts: list[str]) -> np.ndarray:
-        """Embed a list of texts; returns shape (n, 768) float32."""
+        if not self.api_key:
+            raise EmbeddingError("Embedding failed: GEMINI_API_KEY is not configured.")
+
+        vectors: list[list[float]] = []
+        for text in texts:
+            vectors.append(await self._embed_single(text))
+        return np.array(vectors, dtype=np.float32)
+
+    async def _embed_single(self, text: str) -> list[float]:
+        url = _EMBEDDING_API_URL.format(model=self.model_name)
+        payload = {
+            "model": f"models/{self.model_name}",
+            "content": {
+                "parts": [{"text": text}],
+            },
+            "outputDimensionality": self.embedding_dim,
+        }
+
         try:
-            return await asyncio.to_thread(self._embed_texts_sync, texts)
-        except Exception as exc:
-            logger.error("Embedding failed: %s", exc)
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    url,
+                    params={"key": self.api_key},
+                    json=payload,
+                )
+                response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            detail = exc.response.text
+            logger.error("Gemini API embedding failed: %s", detail)
+            raise EmbeddingError(f"Embedding failed: {detail}") from exc
+        except httpx.HTTPError as exc:
+            logger.error("Gemini API embedding request failed: %s", exc)
             raise EmbeddingError(f"Embedding failed: {exc}") from exc
 
-    def _embed_texts_sync(self, texts: list[str]) -> np.ndarray:
-        model = self._get_model()
-        all_embeddings: list[list[float]] = []
-        for i in range(0, len(texts), BATCH_SIZE):
-            batch = texts[i : i + BATCH_SIZE]
-            embeddings = model.get_embeddings(batch)
-            all_embeddings.extend([e.values for e in embeddings])
-        return np.array(all_embeddings, dtype=np.float32)
+        data = response.json()
+        try:
+            return data["embedding"]["values"]
+        except (KeyError, TypeError) as exc:
+            logger.error("Unexpected Gemini embedding response: %s", data)
+            raise EmbeddingError("Embedding failed: unexpected Gemini API response.") from exc
 
     async def embed_query(self, query: str) -> np.ndarray:
-        """Embed a single query string; returns shape (768,) float32."""
         result = await self.embed_texts([query])
         return result[0]

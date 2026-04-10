@@ -1,5 +1,4 @@
 from functools import lru_cache
-from pathlib import Path
 
 from app.config import get_settings
 from app.models.paper import PaperStatus, ProcessingStatus
@@ -27,8 +26,7 @@ def get_chunker() -> SemanticChunker:
 def get_vertex_ai_client() -> VertexAIClient:
     settings = get_settings()
     return VertexAIClient(
-        project_id=settings.vertex_project_id,
-        location=settings.vertex_location,
+        api_key=settings.gemini_api_key,
         model_name=settings.gemini_model,
     )
 
@@ -37,8 +35,7 @@ def get_vertex_ai_client() -> VertexAIClient:
 def get_embedding_service() -> EmbeddingService:
     settings = get_settings()
     return EmbeddingService(
-        project_id=settings.vertex_project_id,
-        location=settings.vertex_location,
+        api_key=settings.gemini_api_key,
         model_name=settings.embedding_model,
     )
 
@@ -46,7 +43,7 @@ def get_embedding_service() -> EmbeddingService:
 @lru_cache
 def get_vector_store() -> VectorStore:
     settings = get_settings()
-    return VectorStore(embedding_dim=768, index_path=Path(settings.faiss_index_path))
+    return VectorStore(embedding_dim=768, index_path=settings.faiss_index_dir)
 
 
 @lru_cache
