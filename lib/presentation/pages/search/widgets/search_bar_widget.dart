@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 class SearchBarWidget extends StatefulWidget {
@@ -16,27 +17,19 @@ class SearchBarWidget extends StatefulWidget {
 
 class _SearchBarWidgetState extends State<SearchBarWidget> {
   final _controller = SearchController();
-  final _debounce = ValueNotifier<String>('');
-
-  @override
-  void initState() {
-    super.initState();
-    _debounce.addListener(_onDebounced);
-  }
-
-  void _onDebounced() {
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (_debounce.value.length >= 3) {
-        widget.onSearch(_debounce.value);
-      }
-    });
-  }
-
   @override
   void dispose() {
     _controller.dispose();
-    _debounce.dispose();
     super.dispose();
+  }
+
+  void _onSubmitted(String value) {
+    if (value.trim().isNotEmpty) widget.onSearch(value.trim());
+  }
+
+  void _onClear() {
+    _controller.clear();
+    setState(() {});
   }
 
   @override
@@ -57,16 +50,10 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
           if (_controller.text.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.clear),
-              onPressed: () {
-                _controller.clear();
-                _debounce.value = '';
-              },
+              onPressed: _onClear,
             ),
         ],
-        onChanged: (value) => _debounce.value = value,
-        onSubmitted: (value) {
-          if (value.isNotEmpty) widget.onSearch(value);
-        },
+        onSubmitted: _onSubmitted,
       ),
     );
   }
