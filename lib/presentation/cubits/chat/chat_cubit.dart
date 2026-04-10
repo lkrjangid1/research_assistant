@@ -24,6 +24,7 @@ class ChatCubit extends Cubit<ChatState> {
     _session = ChatSession(
       sessionId: const Uuid().v4(),
       paperIds: papers.map((p) => p.arxivId).toList(),
+      paperTitles: {for (final p in papers) p.arxivId: p.title},
       messages: const [],
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),

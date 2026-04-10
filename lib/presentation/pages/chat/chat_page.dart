@@ -9,14 +9,24 @@ import 'widgets/message_bubble.dart';
 import 'widgets/slash_command_overlay.dart';
 
 class ChatPage extends StatelessWidget {
-  const ChatPage({super.key});
+  /// If non-null, the chat page will resume this session from Hive instead of
+  /// starting a new one from the current paper selection.
+  final String? sessionId;
+
+  const ChatPage({super.key, this.sessionId});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider<ChatCubit>(
       create: (ctx) {
-        final selection = ctx.read<PaperSelectionCubit>().state;
-        return sl<ChatCubit>()..initSession(selection.selectedPapers);
+        final cubit = sl<ChatCubit>();
+        if (sessionId != null) {
+          cubit.loadSession(sessionId!);
+        } else {
+          final selection = ctx.read<PaperSelectionCubit>().state;
+          cubit.initSession(selection.selectedPapers);
+        }
+        return cubit;
       },
       child: const _ChatView(),
     );

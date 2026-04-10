@@ -22,13 +22,14 @@ class ChatSessionModelAdapter extends TypeAdapter<ChatSessionModel> {
       messages: (fields[2] as List).cast<MessageModel>(),
       createdAt: fields[3] as DateTime,
       updatedAt: fields[4] as DateTime,
+      paperTitles: (fields[5] as Map).cast<String, String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, ChatSessionModel obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.sessionId)
       ..writeByte(1)
@@ -38,7 +39,9 @@ class ChatSessionModelAdapter extends TypeAdapter<ChatSessionModel> {
       ..writeByte(3)
       ..write(obj.createdAt)
       ..writeByte(4)
-      ..write(obj.updatedAt);
+      ..write(obj.updatedAt)
+      ..writeByte(5)
+      ..write(obj.paperTitles);
   }
 
   @override

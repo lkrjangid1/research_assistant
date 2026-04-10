@@ -19,6 +19,7 @@ import '../../presentation/cubits/paper_selection/paper_selection_cubit.dart';
 import '../../presentation/cubits/paper_details/paper_details_cubit.dart';
 import '../../presentation/cubits/chat/chat_cubit.dart';
 import '../../presentation/cubits/settings/settings_cubit.dart';
+import '../../presentation/cubits/chat_history/chat_history_cubit.dart';
 
 final sl = GetIt.instance;
 
@@ -57,6 +58,7 @@ Future<void> initDependencies() async {
         sl<ProcessSlashCommand>(),
         sl<ChatRepository>(),
       ));
+  sl.registerFactory(() => ChatHistoryCubit(sl<ChatRepository>()));
 
   // ── Global cubits (singletons) ─────────────────────────────────────────────
   sl.registerLazySingleton(() => PaperSelectionCubit(sl<PaperRepository>()));

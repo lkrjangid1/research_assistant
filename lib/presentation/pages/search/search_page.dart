@@ -58,6 +58,12 @@ class _SearchViewState extends State<_SearchView> {
         title: const Text('Research Assistant'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Chat History',
+            onPressed: () =>
+                Navigator.pushNamed(context, AppRoutes.chatHistory),
+          ),
+          IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => Navigator.pushNamed(context, AppRoutes.settings),
           ),

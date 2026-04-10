@@ -21,17 +21,22 @@ class ChatSessionModel extends HiveObject {
   @HiveField(4)
   final DateTime updatedAt;
 
+  @HiveField(5)
+  final Map<String, String> paperTitles;
+
   ChatSessionModel({
     required this.sessionId,
     required this.paperIds,
     required this.messages,
     required this.createdAt,
     required this.updatedAt,
+    this.paperTitles = const {},
   });
 
   ChatSession toEntity() => ChatSession(
         sessionId: sessionId,
         paperIds: paperIds,
+        paperTitles: paperTitles,
         messages: messages.map((m) => m.toEntity()).toList(),
         createdAt: createdAt,
         updatedAt: updatedAt,
@@ -40,6 +45,7 @@ class ChatSessionModel extends HiveObject {
   factory ChatSessionModel.fromEntity(ChatSession s) => ChatSessionModel(
         sessionId: s.sessionId,
         paperIds: s.paperIds,
+        paperTitles: s.paperTitles,
         messages: s.messages.map(MessageModel.fromEntity).toList(),
         createdAt: s.createdAt,
         updatedAt: s.updatedAt,
