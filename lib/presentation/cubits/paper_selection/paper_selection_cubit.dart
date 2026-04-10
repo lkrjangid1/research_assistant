@@ -1,6 +1,9 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hive/hive.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/hive_keys.dart';
 import '../../../domain/repositories/paper_repository.dart';
+import '../../../data/models/paper_model.dart';
 import 'paper_selection_state.dart';
 import '../../../domain/entities/paper.dart';
 
@@ -15,6 +18,10 @@ class PaperSelectionCubit extends Cubit<PaperSelectionState> {
       return;
     }
     if (state.selectedPapers.any((p) => p.arxivId == paper.arxivId)) return;
+
+    // Cache full Paper entity so historical chat sessions can reconstruct it
+    Hive.box<PaperModel>(HiveKeys.papersBox)
+        .put(paper.arxivId, PaperModel.fromEntity(paper));
 
     final nextPapers = [...state.selectedPapers, paper];
     final nextStatuses = Map<String, String>.from(state.paperStatuses)

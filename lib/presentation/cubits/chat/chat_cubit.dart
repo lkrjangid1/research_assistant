@@ -1,5 +1,8 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/constants/hive_keys.dart';
+import '../../../data/models/paper_model.dart';
 import '../../../domain/entities/chat_session.dart';
 import '../../../domain/entities/message.dart';
 import '../../../domain/entities/paper.dart';
@@ -30,7 +33,11 @@ class ChatCubit extends Cubit<ChatState> {
       updatedAt: DateTime.now(),
     );
     _messages.clear();
-    emit(ChatSessionLoaded(session: _session, messages: []));
+    emit(ChatSessionLoaded(
+      session: _session,
+      messages: const [],
+      sessionPapers: papers,
+    ));
   }
 
   Future<void> loadSession(String sessionId) async {
@@ -43,7 +50,17 @@ class ChatCubit extends Cubit<ChatState> {
           _messages
             ..clear()
             ..addAll(session.messages);
-          emit(ChatSessionLoaded(session: _session, messages: List.from(_messages)));
+          // Reconstruct full Paper objects from the cached papersBox
+          final box = Hive.box<PaperModel>(HiveKeys.papersBox);
+          final papers = session.paperIds
+              .map((id) => box.get(id)?.toEntity())
+              .whereType<Paper>()
+              .toList();
+          emit(ChatSessionLoaded(
+            session: _session,
+            messages: List.from(_messages),
+            sessionPapers: papers,
+          ));
         }
       },
     );
@@ -84,8 +101,7 @@ class ChatCubit extends Cubit<ChatState> {
       (response) {
         _addMessage(response);
         _persistSession();
-        emit(ChatSessionLoaded(
-          session: _session,
+        emit(currentState.copyWith(
           messages: List.from(_messages),
           isProcessing: false,
         ));
@@ -94,6 +110,9 @@ class ChatCubit extends Cubit<ChatState> {
   }
 
   Future<void> _handleSlashCommand(String raw, Map<String, String> paperTitles) async {
+    final currentState = state;
+    if (currentState is! ChatSessionLoaded) return;
+
     final userMsg = Message(
       messageId: const Uuid().v4(),
       role: 'user',
@@ -102,7 +121,7 @@ class ChatCubit extends Cubit<ChatState> {
       slashCommand: raw.split(' ').first,
     );
     _addMessage(userMsg);
-    emit(ChatSessionLoaded(session: _session, messages: List.from(_messages), isProcessing: true));
+    emit(currentState.copyWith(messages: List.from(_messages), isProcessing: true));
 
     final result = await _processCommand(
       rawCommand: raw,
@@ -112,16 +131,14 @@ class ChatCubit extends Cubit<ChatState> {
     );
 
     result.fold(
-      (failure) => emit(ChatSessionLoaded(
-        session: _session,
+      (failure) => emit(currentState.copyWith(
         messages: List.from(_messages),
         isProcessing: false,
       )),
       (response) {
         _addMessage(response);
         _persistSession();
-        emit(ChatSessionLoaded(
-          session: _session,
+        emit(currentState.copyWith(
           messages: List.from(_messages),
           isProcessing: false,
         ));

@@ -7,6 +7,7 @@ import '../../cubits/paper_selection/paper_selection_cubit.dart';
 import '../../cubits/paper_selection/paper_selection_state.dart';
 import 'widgets/message_bubble.dart';
 import 'widgets/slash_command_overlay.dart';
+import 'widgets/chat_papers_panel.dart';
 import '../chat_history/chat_history_page.dart';
 
 class ChatPage extends StatelessWidget {
@@ -108,85 +109,57 @@ class _ChatViewState extends State<_ChatView> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<PaperSelectionCubit, PaperSelectionState>(
-      builder: (context, selState) {
-        final papersReady = selState.allPapersReady;
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(
-              selState.selectedPapers.isEmpty
-                  ? 'Chat'
-                  : '${selState.selectedPapers.length} paper${selState.selectedPapers.length > 1 ? 's' : ''} selected',
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.history),
-                tooltip: 'Chat History',
-                onPressed: () => _openHistory(context),
-              ),
-            ],
-            bottom: selState.selectedPapers.isNotEmpty
-                ? PreferredSize(
-                    preferredSize: const Size.fromHeight(32),
-                    child: SizedBox(
-                      height: 40,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 4),
-                        children: selState.selectedPapers.map((p) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Chip(
-                              label: Text(
-                                p.title.length > 25
-                                    ? '${p.title.substring(0, 25)}…'
-                                    : p.title,
-                                style: const TextStyle(fontSize: 10),
-                              ),
-                              padding: EdgeInsets.zero,
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          );
-                        }).toList(),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Chat'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Chat History',
+            onPressed: () => _openHistory(context),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // ── Selected papers panel ──────────────────────────────────────────
+          const ChatPapersPanel(),
+          // ── Indexing / error status banner ─────────────────────────────────
+          BlocBuilder<PaperSelectionCubit, PaperSelectionState>(
+            builder: (context, selState) {
+              if (selState.selectedPapers.isEmpty || selState.allPapersReady) {
+                return const SizedBox.shrink();
+              }
+              return Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: Theme.of(context).colorScheme.tertiaryContainer,
+                child: Text(
+                  selState.hasProcessingPapers
+                      ? 'Papers are being indexed — chat unlocks when ready.'
+                      : (selState.error ??
+                          'One or more papers failed to index. Remove them and try again.'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onTertiaryContainer,
                       ),
-                    ),
-                  )
-                : null,
-          ),
-          body: Column(
-            children: [
-              if (!papersReady && selState.selectedPapers.isNotEmpty)
-                Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  child: Text(
-                    selState.hasProcessingPapers
-                        ? 'Selected papers are still being indexed. Chat will unlock when processing finishes.'
-                        : (selState.error ??
-                            'One or more selected papers failed to index. Remove them and try again.'),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
                 ),
-              Expanded(child: _buildMessageList(context)),
-              if (_showSlashOverlay)
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  child: SlashCommandOverlay(
-                    query: _slashQuery,
-                    onSelect: _selectCommand,
-                  ),
-                ),
-              _buildInputBar(context),
-            ],
+              );
+            },
           ),
-        );
-      },
+          Expanded(child: _buildMessageList(context)),
+          if (_showSlashOverlay)
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: SlashCommandOverlay(
+                query: _slashQuery,
+                onSelect: _selectCommand,
+              ),
+            ),
+          _buildInputBar(context),
+        ],
+      ),
     );
   }
 

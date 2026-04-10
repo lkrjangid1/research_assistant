@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import '../../../domain/entities/chat_session.dart';
 import '../../../domain/entities/message.dart';
+import '../../../domain/entities/paper.dart';
 
 abstract class ChatState extends Equatable {
   const ChatState();
@@ -15,24 +16,31 @@ class ChatInitial extends ChatState {
 class ChatSessionLoaded extends ChatState {
   final ChatSession session;
   final List<Message> messages;
+  final List<Paper> sessionPapers;
   final bool isProcessing;
 
   const ChatSessionLoaded({
     required this.session,
     required this.messages,
+    this.sessionPapers = const [],
     this.isProcessing = false,
   });
 
-  ChatSessionLoaded copyWith({List<Message>? messages, bool? isProcessing}) {
+  ChatSessionLoaded copyWith({
+    List<Message>? messages,
+    List<Paper>? sessionPapers,
+    bool? isProcessing,
+  }) {
     return ChatSessionLoaded(
       session: session,
       messages: messages ?? this.messages,
+      sessionPapers: sessionPapers ?? this.sessionPapers,
       isProcessing: isProcessing ?? this.isProcessing,
     );
   }
 
   @override
-  List<Object?> get props => [session, messages, isProcessing];
+  List<Object?> get props => [session, messages, sessionPapers, isProcessing];
 }
 
 class ChatError extends ChatState {
