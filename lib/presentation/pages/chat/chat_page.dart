@@ -56,7 +56,8 @@ class _ChatViewState extends State<_ChatView> {
 
   void _selectCommand(String command) {
     _inputController.text = '$command ';
-    _inputController.selection = TextSelection.collapsed(offset: command.length + 1);
+    _inputController.selection =
+        TextSelection.collapsed(offset: command.length + 1);
     setState(() => _showSlashOverlay = false);
   }
 
@@ -100,10 +101,11 @@ class _ChatViewState extends State<_ChatView> {
                 ? PreferredSize(
                     preferredSize: const Size.fromHeight(32),
                     child: SizedBox(
-                      height: 32,
+                      height: 40,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 4),
                         children: selState.selectedPapers.map((p) {
                           return Padding(
                             padding: const EdgeInsets.only(right: 8),
@@ -115,7 +117,8 @@ class _ChatViewState extends State<_ChatView> {
                                 style: const TextStyle(fontSize: 10),
                               ),
                               padding: EdgeInsets.zero,
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
                               visualDensity: VisualDensity.compact,
                             ),
                           );
@@ -130,19 +133,22 @@ class _ChatViewState extends State<_ChatView> {
               if (!papersReady && selState.selectedPapers.isNotEmpty)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   child: Text(
                     selState.hasProcessingPapers
                         ? 'Selected papers are still being indexed. Chat will unlock when processing finishes.'
-                        : (selState.error ?? 'One or more selected papers failed to index. Remove them and try again.'),
+                        : (selState.error ??
+                            'One or more selected papers failed to index. Remove them and try again.'),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
               Expanded(child: _buildMessageList(context)),
               if (_showSlashOverlay)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   child: SlashCommandOverlay(
                     query: _slashQuery,
                     onSelect: _selectCommand,
@@ -168,7 +174,8 @@ class _ChatViewState extends State<_ChatView> {
 
         if (state is ChatError) {
           return Center(
-            child: Text(state.message, style: const TextStyle(color: Colors.red)),
+            child:
+                Text(state.message, style: const TextStyle(color: Colors.red)),
           );
         }
 
@@ -178,7 +185,8 @@ class _ChatViewState extends State<_ChatView> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey),
+                  const Icon(Icons.chat_bubble_outline,
+                      size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
                   const Text('Ask a question about your selected papers',
                       style: TextStyle(color: Colors.grey)),
@@ -254,32 +262,31 @@ class _ChatViewState extends State<_ChatView> {
                     controller: _inputController,
                     onChanged: _onTextChanged,
                     enabled: inputEnabled,
-                    maxLines: null,
+                    maxLines: 1,
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => _sendMessage(context),
                     decoration: InputDecoration(
-                      hintText: selectionState.allPapersReady
-                          ? 'Ask a question or type / for commands…'
-                          : 'Wait for paper indexing to finish…',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    ),
+                        hintText: selectionState.allPapersReady
+                            ? 'Ask a question or type / for commands'
+                            : 'Wait for paper indexing to finish…',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 4),
+                        suffixIcon: IconButton(
+                          onPressed:
+                              inputEnabled ? () => _sendMessage(context) : null,
+                          icon: isProcessing
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.black),
+                                )
+                              : const Icon(Icons.send, size: 20),
+                        )),
                   ),
-                ),
-                const SizedBox(width: 8),
-                FloatingActionButton.small(
-                  onPressed: inputEnabled ? () => _sendMessage(context) : null,
-                  child: isProcessing
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.send),
                 ),
               ],
             ),
