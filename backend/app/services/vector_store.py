@@ -83,6 +83,44 @@ class VectorStore:
                 break
         return results
 
+    def search_best_for_papers(
+        self,
+        query_embedding: np.ndarray,
+        paper_ids: list[str],
+        top_k: int = 5,
+    ) -> list[SearchResult]:
+        """Return the top-k highest-scoring chunks for the given paper_ids
+        with NO score threshold.  Used for slash commands whose synthesised
+        queries may be semantically distant from raw chunk text even when the
+        paper is clearly relevant."""
+        if self.index.ntotal == 0:
+            return []
+        query = query_embedding.reshape(1, -1).astype(np.float32)
+        faiss.normalize_L2(query)
+        # Expand search to the full index so we don't miss paper-id matches
+        search_k = self.index.ntotal
+        scores, indices = self.index.search(query, search_k)
+
+        paper_id_set = set(paper_ids)
+        results: list[SearchResult] = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx < 0:
+                continue
+            cid = self.chunk_ids[idx]
+            meta = self.metadata[cid]
+            if meta["paper_id"] not in paper_id_set:
+                continue
+            results.append(SearchResult(
+                chunk_id=cid,
+                paper_id=meta["paper_id"],
+                page_number=meta["page_number"],
+                text=meta["text"],
+                score=float(score),
+            ))
+            if len(results) >= top_k:
+                break
+        return results
+
     # ── Removal ───────────────────────────────────────────────────────────────
 
     def remove_paper(self, paper_id: str) -> None:

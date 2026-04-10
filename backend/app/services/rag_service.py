@@ -88,7 +88,10 @@ class RAGService:
         elif cmd == "visualize":
             vis_type = (args or "architecture").strip()
             question = (
-                f"Describe how to create a {vis_type} visualization of the key concepts in the selected papers."
+                f"Describe the key components, modules, inputs, outputs, and relationships "
+                f"in the {vis_type} of the proposed method or system in the selected papers. "
+                f"List each component and its role, then describe how they connect. "
+                f"Format the answer as a structured description that could be used to draw a {vis_type} diagram."
             )
         elif cmd == "explain":
             term = (args or "").strip()
@@ -96,7 +99,26 @@ class RAGService:
         else:
             question = f"Help me understand the selected papers regarding: {args or 'general overview'}."
 
-        return await self.query(question, paper_ids, paper_titles)
+        # Slash-command queries are broad/synthetic and may score low against
+        # raw paper chunks even when the paper is clearly relevant.
+        # Use search_best_for_papers() which bypasses the score threshold and
+        # simply returns the highest-scoring chunks for the requested papers.
+        query_embedding = await self.embedding_service.embed_query(question)
+        results = self.vector_store.search_best_for_papers(
+            query_embedding, paper_ids, self.top_k
+        )
+
+        if not results:
+            return RAGResponse(
+                text="I couldn't find relevant content in the selected papers for this request.",
+                citations=[],
+            )
+
+        context = self._build_context(results, paper_titles)
+        prompt = self._build_prompt(question, context)
+        response_text = await self.llm_client.generate(prompt)
+        citations = self._extract_citations(results, paper_titles)
+        return RAGResponse(text=response_text, citations=citations)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
