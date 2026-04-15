@@ -24,13 +24,11 @@ class _ChatHistoryView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded,
-              color: AppColors.textSecondary),
+          icon: Icon(Icons.arrow_back_rounded, color: cs.onSurfaceVariant),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
@@ -40,10 +38,7 @@ class _ChatHistoryView extends StatelessWidget {
               height: 30,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [
-                    AppColors.gradientBlue,
-                    AppColors.gradientPurple,
-                  ],
+                  colors: [AppColors.gradientBlue, AppColors.gradientPurple],
                 ),
                 borderRadius: BorderRadius.circular(9),
               ),
@@ -58,19 +53,13 @@ class _ChatHistoryView extends StatelessWidget {
       body: BlocBuilder<ChatHistoryCubit, ChatHistoryState>(
         builder: (context, state) {
           if (state is ChatHistoryInitial) {
-            return const Center(
+            return Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  AppColors.gradientBlue,
-                ),
+                valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
               ),
             );
           }
-
-          if (state is ChatHistoryEmpty) {
-            return _buildEmptyState();
-          }
-
+          if (state is ChatHistoryEmpty) return _buildEmptyState(cs);
           if (state is ChatHistoryLoaded) {
             return ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -79,14 +68,13 @@ class _ChatHistoryView extends StatelessWidget {
                   _SessionCard(session: state.sessions[i]),
             );
           }
-
           return const SizedBox.shrink();
         },
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(ColorScheme cs) {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -107,21 +95,21 @@ class _ChatHistoryView extends StatelessWidget {
                 size: 36, color: AppColors.gradientBlue),
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'No past sessions',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: cs.onSurface,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Add papers and start a chat\nto see history here.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: AppColors.textSecondary,
+              color: cs.onSurfaceVariant,
               height: 1.5,
             ),
           ),
@@ -133,7 +121,6 @@ class _ChatHistoryView extends StatelessWidget {
 
 class _SessionCard extends StatefulWidget {
   final ChatSession session;
-
   const _SessionCard({required this.session});
 
   @override
@@ -145,6 +132,8 @@ class _SessionCardState extends State<_SessionCard> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Dismissible(
@@ -161,7 +150,7 @@ class _SessionCardState extends State<_SessionCard> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppColors.error.withValues(alpha: 0.12),
+              color: AppColors.error.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.delete_outline_rounded,
@@ -178,13 +167,13 @@ class _SessionCardState extends State<_SessionCard> {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: cs.surface,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.surfaceBorder),
+              border: Border.all(color: cs.outlineVariant),
               boxShadow: [
                 BoxShadow(
-                  color:
-                      Colors.black.withValues(alpha: _hovered ? 0.08 : 0.03),
+                  color: Colors.black
+                      .withValues(alpha: _hovered ? 0.08 : 0.03),
                   blurRadius: _hovered ? 20 : 8,
                   offset: Offset(0, _hovered ? 6 : 2),
                 ),
@@ -199,7 +188,6 @@ class _SessionCardState extends State<_SessionCard> {
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      // Avatar
                       Container(
                         width: 48,
                         height: 48,
@@ -226,7 +214,6 @@ class _SessionCardState extends State<_SessionCard> {
                         ),
                       ),
                       const SizedBox(width: 14),
-                      // Content
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -235,10 +222,10 @@ class _SessionCardState extends State<_SessionCard> {
                               widget.session.displayTitle,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
+                                color: cs.onSurface,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -246,37 +233,37 @@ class _SessionCardState extends State<_SessionCard> {
                               widget.session.lastMessagePreview,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: AppColors.textSecondary,
+                                color: cs.onSurfaceVariant,
                                 height: 1.4,
                               ),
                             ),
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                const Icon(Icons.access_time_rounded,
+                                Icon(Icons.access_time_rounded,
                                     size: 11,
-                                    color: AppColors.textTertiary),
+                                    color: cs.onSurfaceVariant),
                                 const SizedBox(width: 3),
                                 Text(
                                   DateFormatter.timeAgo(
                                       widget.session.updatedAt),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
-                                    color: AppColors.textTertiary,
+                                    color: cs.onSurfaceVariant,
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                const Icon(Icons.article_outlined,
+                                Icon(Icons.article_outlined,
                                     size: 11,
-                                    color: AppColors.textTertiary),
+                                    color: cs.onSurfaceVariant),
                                 const SizedBox(width: 3),
                                 Text(
                                   '${widget.session.paperIds.length} paper${widget.session.paperIds.length > 1 ? 's' : ''}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
-                                    color: AppColors.textTertiary,
+                                    color: cs.onSurfaceVariant,
                                   ),
                                 ),
                               ],
@@ -285,8 +272,8 @@ class _SessionCardState extends State<_SessionCard> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Icon(Icons.chevron_right_rounded,
-                          color: AppColors.textTertiary, size: 20),
+                      Icon(Icons.chevron_right_rounded,
+                          color: cs.onSurfaceVariant, size: 20),
                     ],
                   ),
                 ),
@@ -299,32 +286,31 @@ class _SessionCardState extends State<_SessionCard> {
   }
 
   Future<bool?> _confirmDelete(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete Session?'),
-        content: const Text(
-            'This chat history will be permanently removed.'),
+        title: Text('Delete Session?',
+            style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w700)),
+        content: Text('This chat history will be permanently removed.',
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.textSecondary)),
+            child: Text('Cancel',
+                style: TextStyle(color: cs.onSurfaceVariant)),
           ),
           GestureDetector(
             onTap: () => Navigator.pop(context, true),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 color: AppColors.error,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                'Delete',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w600),
-              ),
+              child: const Text('Delete',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w600)),
             ),
           ),
         ],

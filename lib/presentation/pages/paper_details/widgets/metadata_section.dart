@@ -11,18 +11,20 @@ class MetadataSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: cs.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.surfaceBorder),
-          boxShadow: const [
+          border: Border.all(color: cs.outlineVariant),
+          boxShadow: [
             BoxShadow(
-              color: AppColors.cardShadow,
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 12,
-              offset: Offset(0, 4),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -31,40 +33,30 @@ class MetadataSection extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Title
               Text(
                 paper.title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: cs.onSurface,
                   height: 1.4,
                 ),
               ),
               const SizedBox(height: 16),
-              // Metadata rows
-              _MetaRow(
-                icon: Icons.person_outline_rounded,
-                text: paper.authors.join(', '),
-              ),
+              _MetaRow(icon: Icons.person_outline_rounded,
+                  text: paper.authors.join(', '), cs: cs),
               const SizedBox(height: 8),
               _MetaRow(
-                icon: Icons.calendar_today_outlined,
-                text: DateFormatter.formatPublishedDate(paper.publishedDate),
-              ),
+                  icon: Icons.calendar_today_outlined,
+                  text: DateFormatter.formatPublishedDate(paper.publishedDate),
+                  cs: cs),
               const SizedBox(height: 8),
-              _MetaRow(
-                icon: Icons.label_outline_rounded,
-                text: paper.categories.join(' · '),
-              ),
+              _MetaRow(icon: Icons.label_outline_rounded,
+                  text: paper.categories.join(' · '), cs: cs),
               const SizedBox(height: 8),
-              _MetaRow(
-                icon: Icons.fingerprint_rounded,
-                text: paper.arxivId,
-                isMonospace: true,
-              ),
+              _MetaRow(icon: Icons.fingerprint_rounded,
+                  text: paper.arxivId, cs: cs, isMonospace: true),
               const SizedBox(height: 16),
-              // Action buttons
               Row(
                 children: [
                   _ActionButton(
@@ -84,21 +76,8 @@ class MetadataSection extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 20),
-              // Abstract divider
-              Container(
-                width: double.infinity,
-                height: 1,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color(0x00F3F4F6),
-                      AppColors.surfaceBorder,
-                      Color(0x00F3F4F6),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
+              Divider(color: cs.outlineVariant),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Container(
@@ -117,12 +96,12 @@ class MetadataSection extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'Abstract',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: cs.onSurface,
                     ),
                   ),
                 ],
@@ -130,9 +109,9 @@ class MetadataSection extends StatelessWidget {
               const SizedBox(height: 10),
               Text(
                 paper.abstract,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecondary,
+                  color: cs.onSurfaceVariant,
                   height: 1.7,
                 ),
               ),
@@ -152,11 +131,13 @@ class MetadataSection extends StatelessWidget {
 class _MetaRow extends StatelessWidget {
   final IconData icon;
   final String text;
+  final ColorScheme cs;
   final bool isMonospace;
 
   const _MetaRow({
     required this.icon,
     required this.text,
+    required this.cs,
     this.isMonospace = false,
   });
 
@@ -169,7 +150,7 @@ class _MetaRow extends StatelessWidget {
           width: 28,
           height: 28,
           decoration: BoxDecoration(
-            color: AppColors.gradientBlue.withValues(alpha: 0.08),
+            color: AppColors.gradientBlue.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(7),
           ),
           child: Icon(icon, size: 14, color: AppColors.gradientBlue),
@@ -182,9 +163,10 @@ class _MetaRow extends StatelessWidget {
               text,
               style: TextStyle(
                 fontSize: 13,
-                color: AppColors.textSecondary,
+                color: cs.onSurfaceVariant,
                 fontFamily: isMonospace ? 'monospace' : null,
-                fontWeight: isMonospace ? FontWeight.w500 : FontWeight.w400,
+                fontWeight:
+                    isMonospace ? FontWeight.w500 : FontWeight.w400,
               ),
             ),
           ),
@@ -216,6 +198,7 @@ class _ActionButtonState extends State<_ActionButton> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -228,25 +211,23 @@ class _ActionButtonState extends State<_ActionButton> {
             gradient: widget.isPrimary
                 ? LinearGradient(
                     colors: _hovered
-                        ? [
-                            const Color(0xFF5A95F5),
-                            const Color(0xFF8B7AEF),
-                          ]
+                        ? [const Color(0xFF5A95F5), const Color(0xFF8B7AEF)]
                         : [
                             AppColors.gradientBlue,
                             AppColors.gradientSlateBlue,
                           ],
                   )
                 : null,
-            color: widget.isPrimary ? null : AppColors.backgroundSecondary,
+            color: widget.isPrimary ? null : cs.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(20),
             border: widget.isPrimary
                 ? null
-                : Border.all(color: AppColors.surfaceBorder),
+                : Border.all(color: cs.outlineVariant),
             boxShadow: widget.isPrimary
                 ? [
                     BoxShadow(
-                      color: AppColors.gradientBlue.withValues(alpha: 0.25),
+                      color:
+                          AppColors.gradientBlue.withValues(alpha: 0.25),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -259,9 +240,7 @@ class _ActionButtonState extends State<_ActionButton> {
               Icon(
                 widget.icon,
                 size: 15,
-                color: widget.isPrimary
-                    ? Colors.white
-                    : AppColors.textSecondary,
+                color: widget.isPrimary ? Colors.white : cs.onSurfaceVariant,
               ),
               const SizedBox(width: 6),
               Text(
@@ -271,7 +250,7 @@ class _ActionButtonState extends State<_ActionButton> {
                   fontWeight: FontWeight.w600,
                   color: widget.isPrimary
                       ? Colors.white
-                      : AppColors.textSecondary,
+                      : cs.onSurfaceVariant,
                 ),
               ),
             ],

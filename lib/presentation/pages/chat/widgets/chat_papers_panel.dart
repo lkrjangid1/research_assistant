@@ -47,6 +47,8 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return BlocBuilder<ChatCubit, ChatState>(
       builder: (context, chatState) {
         final papers = chatState is ChatSessionLoaded
@@ -62,20 +64,17 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
 
         return Container(
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            border: const Border(
-              bottom: BorderSide(color: AppColors.surfaceBorder),
-            ),
+            color: cs.surface,
+            border: Border(bottom: BorderSide(color: cs.outlineVariant)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header
               InkWell(
                 onTap: _toggle,
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 10),
                   child: Row(
                     children: [
                       Container(
@@ -96,10 +95,10 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
                       const SizedBox(width: 8),
                       Text(
                         '${papers.length} paper${papers.length > 1 ? 's' : ''} in context',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: cs.onSurface,
                         ),
                       ),
                       const Spacer(),
@@ -109,13 +108,12 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              SizedBox(
+                              const SizedBox(
                                 width: 12,
                                 height: 12,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 1.5,
-                                  valueColor:
-                                      const AlwaysStoppedAnimation<Color>(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
                                     AppColors.gradientFuchsia,
                                   ),
                                 ),
@@ -135,22 +133,22 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
                       AnimatedRotation(
                         turns: _expanded ? 0 : -0.5,
                         duration: const Duration(milliseconds: 250),
-                        child: const Icon(Icons.expand_less_rounded,
-                            size: 20, color: AppColors.textTertiary),
+                        child: Icon(Icons.expand_less_rounded,
+                            size: 20, color: cs.onSurfaceVariant),
                       ),
                     ],
                   ),
                 ),
               ),
-              // Paper list
               SizeTransition(
                 sizeFactor: _sizeAnimation,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: papers.map((p) {
                     final canRemove = selState.isSelected(p.arxivId);
-                    final status =
-                        canRemove ? selState.statusFor(p.arxivId) : 'completed';
+                    final status = canRemove
+                        ? selState.statusFor(p.arxivId)
+                        : 'completed';
                     return _PaperRow(
                       paper: p,
                       status: status,
@@ -180,6 +178,8 @@ class _PaperRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return InkWell(
       onTap: () => Navigator.pushNamed(
         context,
@@ -190,7 +190,6 @@ class _PaperRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
         child: Row(
           children: [
-            // Status indicator
             Container(
               width: 8,
               height: 8,
@@ -198,17 +197,8 @@ class _PaperRow extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _statusColor(status),
-                boxShadow: status == 'completed'
-                    ? [
-                        BoxShadow(
-                          color: AppColors.success.withValues(alpha: 0.4),
-                          blurRadius: 4,
-                        )
-                      ]
-                    : null,
               ),
             ),
-            // Paper info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,10 +208,10 @@ class _PaperRow extends StatelessWidget {
                     paper.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.textPrimary,
+                      color: cs.onSurface,
                     ),
                   ),
                   if (paper.authors.isNotEmpty)
@@ -230,9 +220,9 @@ class _PaperRow extends StatelessWidget {
                           (paper.authors.length > 2 ? ' et al.' : ''),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.textTertiary,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                 ],
@@ -241,10 +231,10 @@ class _PaperRow extends StatelessWidget {
             _StatusBadge(status: status),
             if (canRemove)
               IconButton(
-                icon: const Icon(Icons.close_rounded, size: 16),
+                icon: Icon(Icons.close_rounded,
+                    size: 16, color: cs.onSurfaceVariant),
                 tooltip: 'Remove from chat',
                 visualDensity: VisualDensity.compact,
-                color: AppColors.textTertiary,
                 onPressed: () => context
                     .read<PaperSelectionCubit>()
                     .removePaper(paper.arxivId),
@@ -276,13 +266,11 @@ class _StatusBadge extends StatelessWidget {
     if (status == 'completed' || status == 'idle') {
       return const SizedBox.shrink();
     }
-
     final (label, color) = switch (status) {
       'processing' => ('Indexing', AppColors.gradientFuchsia),
       'failed' => ('Failed', AppColors.error),
       _ => ('', AppColors.textTertiary),
     };
-
     if (label.isEmpty) return const SizedBox.shrink();
 
     return Container(

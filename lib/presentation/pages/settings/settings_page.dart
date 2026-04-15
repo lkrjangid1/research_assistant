@@ -11,13 +11,11 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded,
-              color: AppColors.textSecondary),
+          icon: Icon(Icons.arrow_back_rounded, color: cs.onSurfaceVariant),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
@@ -26,12 +24,12 @@ class SettingsPage extends StatelessWidget {
               width: 30,
               height: 30,
               decoration: BoxDecoration(
-                color: AppColors.backgroundSecondary,
+                color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: AppColors.surfaceBorder),
+                border: Border.all(color: cs.outlineVariant),
               ),
-              child: const Icon(Icons.settings_outlined,
-                  size: 16, color: AppColors.textSecondary),
+              child: Icon(Icons.settings_outlined,
+                  size: 16, color: cs.onSurfaceVariant),
             ),
             const SizedBox(width: 10),
             const Text('Settings'),
@@ -41,11 +39,9 @@ class SettingsPage extends StatelessWidget {
       body: BlocBuilder<SettingsCubit, SettingsState>(
         builder: (context, state) {
           if (state.isLoading) {
-            return const Center(
+            return Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  AppColors.gradientBlue,
-                ),
+                valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
               ),
             );
           }
@@ -114,15 +110,15 @@ class SettingsPage extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.backgroundSecondary,
+                        color: cs.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.surfaceBorder),
+                        border: Border.all(color: cs.outlineVariant),
                       ),
-                      child: const Text(
+                      child: Text(
                         'v1.0.0',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textTertiary,
+                          color: cs.onSurfaceVariant,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -149,29 +145,22 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _confirmClear(BuildContext context) async {
+    final cs = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24)),
-        title: const Text(
-          'Clear All Data?',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        content: const Text(
+        title: Text('Clear All Data?',
+            style: TextStyle(
+                fontWeight: FontWeight.w700, color: cs.onSurface)),
+        content: Text(
           'This will delete all chat sessions and cached paper data. This cannot be undone.',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+          style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
+            child: Text('Cancel',
+                style: TextStyle(color: cs.onSurfaceVariant)),
           ),
           GestureDetector(
             onTap: () => Navigator.pop(context, true),
@@ -182,11 +171,9 @@ class SettingsPage extends StatelessWidget {
                 color: AppColors.error,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                'Clear',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w600),
-              ),
+              child: const Text('Clear',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w600)),
             ),
           ),
         ],
@@ -216,6 +203,7 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -223,24 +211,24 @@ class _SectionCard extends StatelessWidget {
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
             title.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: AppColors.textTertiary,
+              color: cs.onSurfaceVariant,
               letterSpacing: 1.0,
             ),
           ),
         ),
         Container(
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: cs.surface,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.surfaceBorder),
-            boxShadow: const [
+            border: Border.all(color: cs.outlineVariant),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.cardShadow,
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 8,
-                offset: Offset(0, 2),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -251,8 +239,11 @@ class _SectionCard extends StatelessWidget {
                 children: [
                   e.value,
                   if (!isLast)
-                    const Divider(
-                        height: 1, indent: 56, endIndent: 16),
+                    Divider(
+                        height: 1,
+                        indent: 56,
+                        endIndent: 16,
+                        color: cs.outlineVariant),
                 ],
               );
             }).toList(),
@@ -280,6 +271,7 @@ class _SettingsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -288,7 +280,7 @@ class _SettingsRow extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.1),
+              color: iconColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, size: 18, color: iconColor),
@@ -300,19 +292,19 @@ class _SettingsRow extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
+                    color: cs.onSurface,
                   ),
                 ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 2),
                   Text(
                     subtitle!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textTertiary,
+                      color: cs.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -348,6 +340,7 @@ class _DangerRowState extends State<_DangerRow> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) {
@@ -360,8 +353,7 @@ class _DangerRowState extends State<_DangerRow> {
         color: _pressed
             ? AppColors.error.withValues(alpha: 0.04)
             : Colors.transparent,
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
             Container(
@@ -371,8 +363,7 @@ class _DangerRowState extends State<_DangerRow> {
                 color: AppColors.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(widget.icon,
-                  size: 18, color: AppColors.error),
+              child: Icon(widget.icon, size: 18, color: AppColors.error),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -390,16 +381,16 @@ class _DangerRowState extends State<_DangerRow> {
                   const SizedBox(height: 2),
                   Text(
                     widget.subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textTertiary,
+                      color: cs.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded,
-                size: 18, color: AppColors.textTertiary),
+            Icon(Icons.chevron_right_rounded,
+                size: 18, color: cs.onSurfaceVariant),
           ],
         ),
       ),
@@ -411,11 +402,11 @@ class _GradientSwitch extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
 
-  const _GradientSwitch(
-      {required this.value, required this.onChanged});
+  const _GradientSwitch({required this.value, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => onChanged(!value),
       child: AnimatedContainer(
@@ -431,7 +422,7 @@ class _GradientSwitch extends StatelessWidget {
                   ],
                 )
               : null,
-          color: value ? null : const Color(0xFFE5E7EB),
+          color: value ? null : cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Padding(
@@ -472,32 +463,31 @@ class _ExpertiseDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.backgroundSecondary,
+        color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.surfaceBorder),
+        border: Border.all(color: cs.outlineVariant),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
           isDense: true,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded,
-              size: 16, color: AppColors.textTertiary),
-          style: const TextStyle(
+          dropdownColor: cs.surface,
+          icon: Icon(Icons.keyboard_arrow_down_rounded,
+              size: 16, color: cs.onSurfaceVariant),
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
+            color: cs.onSurfaceVariant,
           ),
           items: const [
+            DropdownMenuItem(value: 'beginner', child: Text('Beginner')),
             DropdownMenuItem(
-                value: 'beginner', child: Text('Beginner')),
-            DropdownMenuItem(
-                value: 'intermediate',
-                child: Text('Intermediate')),
-            DropdownMenuItem(
-                value: 'expert', child: Text('Expert')),
+                value: 'intermediate', child: Text('Intermediate')),
+            DropdownMenuItem(value: 'expert', child: Text('Expert')),
           ],
           onChanged: onChanged,
         ),

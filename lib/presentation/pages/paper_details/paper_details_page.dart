@@ -32,9 +32,10 @@ class _PaperDetailsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: _buildAppBar(context),
+      appBar: _buildAppBar(context, cs),
       body: GradientOrbsBackground(
         child: CustomScrollView(
           slivers: [
@@ -44,7 +45,8 @@ class _PaperDetailsView extends StatelessWidget {
           ],
         ),
       ),
-      floatingActionButton: BlocBuilder<PaperSelectionCubit, PaperSelectionState>(
+      floatingActionButton:
+          BlocBuilder<PaperSelectionCubit, PaperSelectionState>(
         builder: (context, state) {
           if (!state.isSelected(paper.arxivId)) return const SizedBox.shrink();
           return Container(
@@ -67,8 +69,7 @@ class _PaperDetailsView extends StatelessWidget {
                 onTap: () => Navigator.pushNamed(context, AppRoutes.chat),
                 borderRadius: BorderRadius.circular(16),
                 child: const Padding(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -94,12 +95,10 @@ class _PaperDetailsView extends StatelessWidget {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
+  PreferredSizeWidget _buildAppBar(BuildContext context, ColorScheme cs) {
     return AppBar(
-      backgroundColor: AppColors.surface,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_rounded,
-            color: AppColors.textSecondary),
+        icon: Icon(Icons.arrow_back_rounded, color: cs.onSurfaceVariant),
         onPressed: () => Navigator.pop(context),
       ),
       title: const Text('Paper Details'),
@@ -121,8 +120,8 @@ class _PaperDetailsView extends StatelessWidget {
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
                     gradient: isSelected
                         ? const LinearGradient(
@@ -132,23 +131,19 @@ class _PaperDetailsView extends StatelessWidget {
                             ],
                           )
                         : null,
-                    color: isSelected ? null : AppColors.backgroundSecondary,
+                    color: isSelected ? null : cs.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(20),
                     border: isSelected
                         ? null
-                        : Border.all(color: AppColors.surfaceBorder),
+                        : Border.all(color: cs.outlineVariant),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isSelected
-                            ? Icons.check_rounded
-                            : Icons.add_rounded,
+                        isSelected ? Icons.check_rounded : Icons.add_rounded,
                         size: 15,
-                        color: isSelected
-                            ? Colors.white
-                            : AppColors.textSecondary,
+                        color: isSelected ? Colors.white : cs.onSurfaceVariant,
                       ),
                       const SizedBox(width: 4),
                       Text(
@@ -158,7 +153,7 @@ class _PaperDetailsView extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                           color: isSelected
                               ? Colors.white
-                              : AppColors.textSecondary,
+                              : cs.onSurfaceVariant,
                         ),
                       ),
                     ],

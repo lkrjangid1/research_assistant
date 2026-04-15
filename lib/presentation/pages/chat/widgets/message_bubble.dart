@@ -12,6 +12,7 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final isUser = message.isUser;
 
     return Padding(
@@ -30,10 +31,7 @@ class MessageBubble extends StatelessWidget {
             padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
             child: Text(
               DateFormatter.timeAgo(message.timestamp),
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textTertiary,
-              ),
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
             ),
           ),
         ],
@@ -64,7 +62,7 @@ class _UserBubble extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.gradientBlue.withValues(alpha: 0.2),
+            color: AppColors.gradientBlue.withValues(alpha: 0.25),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -72,11 +70,7 @@ class _UserBubble extends StatelessWidget {
       ),
       child: Text(
         message.content,
-        style: const TextStyle(
-          fontSize: 15,
-          color: Colors.white,
-          height: 1.5,
-        ),
+        style: const TextStyle(fontSize: 15, color: Colors.white, height: 1.5),
       ),
     );
   }
@@ -88,10 +82,11 @@ class _AiBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // AI avatar row
         Row(
           children: [
             Container(
@@ -100,10 +95,7 @@ class _AiBubble extends StatelessWidget {
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
-                  colors: [
-                    AppColors.gradientPurple,
-                    AppColors.gradientFuchsia,
-                  ],
+                  colors: [AppColors.gradientPurple, AppColors.gradientFuchsia],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -112,12 +104,12 @@ class _AiBubble extends StatelessWidget {
                   color: Colors.white, size: 14),
             ),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               'AI Assistant',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+                color: cs.onSurfaceVariant,
               ),
             ),
           ],
@@ -126,69 +118,69 @@ class _AiBubble extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: AppColors.backgroundSecondary,
+            color: cs.surfaceContainer,
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(4),
               topRight: Radius.circular(18),
               bottomLeft: Radius.circular(18),
               bottomRight: Radius.circular(18),
             ),
-            border: Border.all(color: AppColors.surfaceBorder),
+            border: Border.all(color: cs.outlineVariant),
           ),
           child: MarkdownBody(
             data: message.content,
             selectable: true,
             styleSheet: MarkdownStyleSheet(
-              p: const TextStyle(
+              p: TextStyle(
                 fontSize: 15,
-                color: AppColors.textPrimary,
+                color: cs.onSurface,
                 height: 1.6,
               ),
-              h1: const TextStyle(
+              h1: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: cs.onSurface,
               ),
-              h2: const TextStyle(
+              h2: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: cs.onSurface,
               ),
-              h3: const TextStyle(
+              h3: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: cs.onSurface,
               ),
-              strong: const TextStyle(
+              strong: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: cs.onSurface,
               ),
-              em: const TextStyle(
+              em: TextStyle(
                 fontStyle: FontStyle.italic,
-                color: AppColors.textSecondary,
+                color: cs.onSurfaceVariant,
               ),
-              code: const TextStyle(
+              code: TextStyle(
                 fontSize: 13,
                 fontFamily: 'monospace',
-                color: AppColors.gradientPurple,
-                backgroundColor: Color(0xFFF5F3FF),
+                color: cs.tertiary,
+                backgroundColor: cs.tertiaryContainer,
               ),
               codeblockDecoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
+                color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.surfaceBorder),
+                border: Border.all(color: cs.outlineVariant),
               ),
-              blockquoteDecoration: const BoxDecoration(
+              blockquoteDecoration: BoxDecoration(
                 border: Border(
                   left: BorderSide(
-                    color: AppColors.gradientBlue,
+                    color: cs.primary,
                     width: 3,
                   ),
                 ),
-                color: Color(0xFFF0F7FF),
+                color: cs.primaryContainer.withValues(alpha: 0.3),
               ),
-              listBullet: const TextStyle(
-                color: AppColors.gradientBlue,
+              listBullet: TextStyle(
+                color: cs.primary,
                 fontWeight: FontWeight.w600,
               ),
             ),

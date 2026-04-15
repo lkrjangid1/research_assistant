@@ -61,6 +61,8 @@ class _PaperCardContentState extends State<_PaperCardContent> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -68,12 +70,12 @@ class _PaperCardContentState extends State<_PaperCardContent> {
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: cs.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: widget.isSelected
                 ? AppColors.gradientBlue.withValues(alpha: 0.4)
-                : AppColors.surfaceBorder,
+                : cs.outlineVariant,
             width: widget.isSelected ? 1.5 : 1,
           ),
           boxShadow: [
@@ -97,17 +99,16 @@ class _PaperCardContentState extends State<_PaperCardContent> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title row
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Text(
                         widget.paper.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: cs.onSurface,
                           height: 1.4,
                         ),
                         maxLines: 2,
@@ -124,7 +125,7 @@ class _PaperCardContentState extends State<_PaperCardContent> {
                           gradient: LinearGradient(
                             colors: [
                               AppColors.gradientBlue,
-                              AppColors.gradientSlateBlue
+                              AppColors.gradientSlateBlue,
                             ],
                           ),
                         ),
@@ -135,30 +136,28 @@ class _PaperCardContentState extends State<_PaperCardContent> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                // Authors
                 Text(
                   widget.paper.authors.take(3).join(', ') +
                       (widget.paper.authors.length > 3 ? ' et al.' : ''),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.textSecondary,
+                    color: cs.onSurfaceVariant,
                     fontWeight: FontWeight.w400,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 10),
-                // Meta row: date + categories
                 Row(
                   children: [
-                    const Icon(Icons.calendar_today_outlined,
-                        size: 12, color: AppColors.textTertiary),
+                    Icon(Icons.calendar_today_outlined,
+                        size: 12, color: cs.onSurfaceVariant),
                     const SizedBox(width: 4),
                     Text(
                       DateFormatter.formatPublishedDate(
                           widget.paper.publishedDate),
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textTertiary),
+                      style: TextStyle(
+                          fontSize: 12, color: cs.onSurfaceVariant),
                     ),
                     const SizedBox(width: 12),
                     ...widget.paper.categories.take(2).map(
@@ -170,19 +169,17 @@ class _PaperCardContentState extends State<_PaperCardContent> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                // Abstract preview
                 Text(
                   widget.paper.abstract,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.textSecondary,
+                    color: cs.onSurfaceVariant,
                     height: 1.5,
                   ),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 14),
-                // Action button
                 Align(
                   alignment: Alignment.centerRight,
                   child: widget.isSelected
@@ -223,7 +220,7 @@ class _CategoryTag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.gradientBlue.withValues(alpha: 0.08),
+        color: AppColors.gradientBlue.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
@@ -245,6 +242,7 @@ class _AddButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -259,7 +257,7 @@ class _AddButton extends StatelessWidget {
                   ],
                 )
               : null,
-          color: enabled ? null : const Color(0xFFF3F4F6),
+          color: enabled ? null : cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
@@ -268,7 +266,7 @@ class _AddButton extends StatelessWidget {
             Icon(
               Icons.add_rounded,
               size: 15,
-              color: enabled ? Colors.white : AppColors.textTertiary,
+              color: enabled ? Colors.white : cs.onSurfaceVariant,
             ),
             const SizedBox(width: 4),
             Text(
@@ -276,7 +274,7 @@ class _AddButton extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: enabled ? Colors.white : AppColors.textTertiary,
+                color: enabled ? Colors.white : cs.onSurfaceVariant,
               ),
             ),
           ],

@@ -77,7 +77,6 @@ class _ChatViewState extends State<_ChatView> {
   void _sendMessage(BuildContext context) {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
-
     final selectionState = context.read<PaperSelectionCubit>().state;
     if (!selectionState.allPapersReady) return;
     context.read<ChatCubit>().sendMessage(text, selectionState.paperTitles);
@@ -110,14 +109,15 @@ class _ChatViewState extends State<_ChatView> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: _buildAppBar(context),
+      appBar: _buildAppBar(context, cs),
       body: Column(
         children: [
           const ChatPapersPanel(),
-          _buildIndexingBanner(context),
-          Expanded(child: _buildMessageList(context)),
+          _buildIndexingBanner(context, cs),
+          Expanded(child: _buildMessageList(context, cs)),
           if (_showSlashOverlay)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -126,17 +126,16 @@ class _ChatViewState extends State<_ChatView> {
                 onSelect: _selectCommand,
               ),
             ),
-          _buildInputBar(context),
+          _buildInputBar(context, cs),
         ],
       ),
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
+  PreferredSizeWidget _buildAppBar(BuildContext context, ColorScheme cs) {
     return AppBar(
-      backgroundColor: AppColors.surface,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textSecondary),
+        icon: Icon(Icons.arrow_back_rounded, color: cs.onSurfaceVariant),
         onPressed: () => Navigator.pop(context),
       ),
       title: Row(
@@ -159,7 +158,7 @@ class _ChatViewState extends State<_ChatView> {
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.history_rounded),
+          icon: Icon(Icons.history_rounded, color: cs.onSurfaceVariant),
           tooltip: 'Chat History',
           onPressed: () => _openHistory(context),
         ),
@@ -167,7 +166,7 @@ class _ChatViewState extends State<_ChatView> {
     );
   }
 
-  Widget _buildIndexingBanner(BuildContext context) {
+  Widget _buildIndexingBanner(BuildContext context, ColorScheme cs) {
     return BlocBuilder<PaperSelectionCubit, PaperSelectionState>(
       builder: (context, selState) {
         if (selState.selectedPapers.isEmpty || selState.allPapersReady) {
@@ -177,15 +176,8 @@ class _ChatViewState extends State<_ChatView> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.gradientFuchsia.withValues(alpha: 0.08),
-                AppColors.gradientBlue.withValues(alpha: 0.08),
-              ],
-            ),
-            border: const Border(
-              bottom: BorderSide(color: AppColors.surfaceBorder),
-            ),
+            color: cs.tertiaryContainer,
+            border: Border(bottom: BorderSide(color: cs.outlineVariant)),
           ),
           child: Row(
             children: [
@@ -206,9 +198,9 @@ class _ChatViewState extends State<_ChatView> {
                       ? 'Papers are being indexed — chat unlocks when ready.'
                       : (selState.error ??
                           'One or more papers failed to index. Remove them and try again.'),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: cs.onTertiaryContainer,
                   ),
                 ),
               ),
@@ -219,17 +211,16 @@ class _ChatViewState extends State<_ChatView> {
     );
   }
 
-  Widget _buildMessageList(BuildContext context) {
+  Widget _buildMessageList(BuildContext context, ColorScheme cs) {
     return BlocConsumer<ChatCubit, ChatState>(
       listener: (context, state) {
         if (state is ChatSessionLoaded) _scrollToBottom();
       },
       builder: (context, state) {
         if (state is ChatInitial) {
-          return const Center(
+          return Center(
             child: CircularProgressIndicator(
-              valueColor:
-                  AlwaysStoppedAnimation<Color>(AppColors.gradientBlue),
+              valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
             ),
           );
         }
@@ -255,8 +246,8 @@ class _ChatViewState extends State<_ChatView> {
                   Text(
                     state.message,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: 14, color: AppColors.textSecondary),
+                    style: TextStyle(
+                        fontSize: 14, color: cs.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -266,17 +257,15 @@ class _ChatViewState extends State<_ChatView> {
 
         if (state is ChatSessionLoaded) {
           if (state.messages.isEmpty) {
-            return _buildEmptyChat(context);
+            return _buildEmptyChat(context, cs);
           }
-
           return ListView.builder(
             controller: _scrollController,
             padding: const EdgeInsets.symmetric(vertical: 12),
-            itemCount:
-                state.messages.length + (state.isProcessing ? 1 : 0),
+            itemCount: state.messages.length + (state.isProcessing ? 1 : 0),
             itemBuilder: (context, i) {
               if (i == state.messages.length) {
-                return _buildThinkingIndicator();
+                return _buildThinkingIndicator(cs);
               }
               return MessageBubble(message: state.messages[i]);
             },
@@ -288,7 +277,7 @@ class _ChatViewState extends State<_ChatView> {
     );
   }
 
-  Widget _buildEmptyChat(BuildContext context) {
+  Widget _buildEmptyChat(BuildContext context, ColorScheme cs) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -301,10 +290,7 @@ class _ChatViewState extends State<_ChatView> {
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
-                  colors: [
-                    AppColors.gradientPurple,
-                    AppColors.gradientFuchsia,
-                  ],
+                  colors: [AppColors.gradientPurple, AppColors.gradientFuchsia],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -313,21 +299,21 @@ class _ChatViewState extends State<_ChatView> {
                   color: Colors.white, size: 32),
             ),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'Ask Anything',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: cs.onSurface,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Ask questions about your selected papers\nor use / commands for AI-powered analysis',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary,
+                color: cs.onSurfaceVariant,
                 height: 1.5,
               ),
             ),
@@ -339,6 +325,7 @@ class _ChatViewState extends State<_ChatView> {
               children: [
                 _StarterChip(
                   label: 'Summarize papers',
+                  cs: cs,
                   onTap: () {
                     _inputController.text = 'Summarize these papers';
                     _sendMessage(context);
@@ -346,6 +333,7 @@ class _ChatViewState extends State<_ChatView> {
                 ),
                 _StarterChip(
                   label: '/compare methodologies',
+                  cs: cs,
                   onTap: () {
                     _inputController.text = '/compare methodologies';
                     _sendMessage(context);
@@ -353,6 +341,7 @@ class _ChatViewState extends State<_ChatView> {
                 ),
                 _StarterChip(
                   label: '/gaps research gaps',
+                  cs: cs,
                   onTap: () {
                     _inputController.text = '/gaps research gaps';
                     _sendMessage(context);
@@ -366,7 +355,7 @@ class _ChatViewState extends State<_ChatView> {
     );
   }
 
-  Widget _buildThinkingIndicator() {
+  Widget _buildThinkingIndicator(ColorScheme cs) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 48, 8),
       child: Row(
@@ -384,25 +373,24 @@ class _ChatViewState extends State<_ChatView> {
                 color: Colors.white, size: 14),
           ),
           const SizedBox(width: 12),
-          const _ThinkingDots(),
+          _ThinkingDots(cs: cs),
         ],
       ),
     );
   }
 
-  Widget _buildInputBar(BuildContext context) {
+  Widget _buildInputBar(BuildContext context, ColorScheme cs) {
     return BlocBuilder<ChatCubit, ChatState>(
       builder: (context, state) {
         final isProcessing =
             state is ChatSessionLoaded && state.isProcessing;
         final selectionState = context.watch<PaperSelectionCubit>().state;
-        final inputEnabled =
-            !isProcessing && selectionState.allPapersReady;
+        final inputEnabled = !isProcessing && selectionState.allPapersReady;
 
         return Container(
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            border: Border(top: BorderSide(color: AppColors.surfaceBorder)),
+          decoration: BoxDecoration(
+            color: cs.surface,
+            border: Border(top: BorderSide(color: cs.outlineVariant)),
           ),
           child: SafeArea(
             child: Padding(
@@ -410,11 +398,11 @@ class _ChatViewState extends State<_ChatView> {
               child: AnimatedGradientBorder(
                 borderRadius: 24,
                 borderWidth: 1.5,
-                duration: Duration(
-                    seconds: _inputFocused || isProcessing ? 2 : 4),
+                duration:
+                    Duration(seconds: _inputFocused || isProcessing ? 2 : 4),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: AppColors.backgroundSecondary,
+                    color: cs.surfaceContainer,
                     borderRadius: BorderRadius.circular(22),
                   ),
                   child: Row(
@@ -431,17 +419,17 @@ class _ChatViewState extends State<_ChatView> {
                             maxLines: 1,
                             textInputAction: TextInputAction.send,
                             onSubmitted: (_) => _sendMessage(context),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 15,
-                              color: AppColors.textPrimary,
+                              color: cs.onSurface,
                             ),
                             decoration: InputDecoration(
                               hintText: selectionState.allPapersReady
                                   ? 'Ask anything or type / for commands'
                                   : 'Waiting for paper indexing…',
-                              hintStyle: const TextStyle(
+                              hintStyle: TextStyle(
                                 fontSize: 14,
-                                color: AppColors.textTertiary,
+                                color: cs.onSurfaceVariant,
                               ),
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
@@ -455,7 +443,6 @@ class _ChatViewState extends State<_ChatView> {
                           ),
                         ),
                       ),
-                      // Send button
                       Padding(
                         padding: const EdgeInsets.all(6),
                         child: GestureDetector(
@@ -476,7 +463,9 @@ class _ChatViewState extends State<_ChatView> {
                                       ],
                                     )
                                   : null,
-                              color: inputEnabled ? null : const Color(0xFFE5E7EB),
+                              color: inputEnabled
+                                  ? null
+                                  : cs.surfaceContainerHighest,
                               boxShadow: inputEnabled
                                   ? [
                                       BoxShadow(
@@ -505,7 +494,7 @@ class _ChatViewState extends State<_ChatView> {
                                     Icons.arrow_upward_rounded,
                                     color: inputEnabled
                                         ? Colors.white
-                                        : AppColors.textTertiary,
+                                        : cs.onSurfaceVariant,
                                     size: 18,
                                   ),
                           ),
@@ -525,9 +514,11 @@ class _ChatViewState extends State<_ChatView> {
 
 class _StarterChip extends StatelessWidget {
   final String label;
+  final ColorScheme cs;
   final VoidCallback onTap;
 
-  const _StarterChip({required this.label, required this.onTap});
+  const _StarterChip(
+      {required this.label, required this.cs, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -536,15 +527,15 @@ class _StarterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: AppColors.backgroundSecondary,
+          color: cs.surfaceContainer,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.surfaceBorder),
+          border: Border.all(color: cs.outlineVariant),
         ),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
-            color: AppColors.textSecondary,
+            color: cs.onSurfaceVariant,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -554,7 +545,8 @@ class _StarterChip extends StatelessWidget {
 }
 
 class _ThinkingDots extends StatefulWidget {
-  const _ThinkingDots();
+  final ColorScheme cs;
+  const _ThinkingDots({required this.cs});
 
   @override
   State<_ThinkingDots> createState() => _ThinkingDotsState();
@@ -581,17 +573,18 @@ class _ThinkingDotsState extends State<_ThinkingDots>
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.backgroundSecondary,
+        color: cs.surfaceContainer,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(4),
           topRight: Radius.circular(18),
           bottomLeft: Radius.circular(18),
           bottomRight: Radius.circular(18),
         ),
-        border: Border.all(color: AppColors.surfaceBorder),
+        border: Border.all(color: cs.outlineVariant),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -608,7 +601,7 @@ class _ThinkingDotsState extends State<_ThinkingDots>
                   child: Container(
                     width: 7,
                     height: 7,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: AppColors.gradientBlue,
                     ),

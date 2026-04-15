@@ -24,6 +24,7 @@ class SlashCommandOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final lq = query.toLowerCase();
     final matches = _commands
         .where((c) => c.$1.contains(lq) || c.$2.toLowerCase().contains(lq))
@@ -34,9 +35,9 @@ class SlashCommandOverlay extends StatelessWidget {
     return Container(
       constraints: const BoxConstraints(maxHeight: 280),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.surfaceBorder),
+        border: Border.all(color: cs.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
@@ -52,7 +53,7 @@ class SlashCommandOverlay extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 8),
           itemCount: matches.length,
           separatorBuilder: (_, __) =>
-              const Divider(height: 1, indent: 48, endIndent: 16),
+              Divider(height: 1, indent: 48, endIndent: 16, color: cs.outlineVariant),
           itemBuilder: (context, i) {
             final cmd = matches[i];
             return _CommandTile(
@@ -90,6 +91,7 @@ class _CommandTileState extends State<_CommandTile> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -98,10 +100,9 @@ class _CommandTileState extends State<_CommandTile> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           color: _hovered
-              ? AppColors.gradientBlue.withValues(alpha: 0.04)
+              ? AppColors.gradientBlue.withValues(alpha: 0.06)
               : Colors.transparent,
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
               Container(
@@ -121,17 +122,17 @@ class _CommandTileState extends State<_CommandTile> {
                   children: [
                     Text(
                       widget.command,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: cs.onSurface,
                       ),
                     ),
                     Text(
                       widget.description,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.textTertiary,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ],

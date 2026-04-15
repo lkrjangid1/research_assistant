@@ -57,7 +57,6 @@ class _SearchViewState extends State<_SearchView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: _buildAppBar(context),
       body: GradientOrbsBackground(
         child: BlocBuilder<SearchCubit, SearchState>(
@@ -79,6 +78,7 @@ class _SearchViewState extends State<_SearchView> {
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return AppBar(
       title: Row(
         children: [
@@ -87,10 +87,7 @@ class _SearchViewState extends State<_SearchView> {
             height: 32,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [
-                  AppColors.gradientBlue,
-                  AppColors.gradientPurple,
-                ],
+                colors: [AppColors.gradientBlue, AppColors.gradientPurple],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -105,7 +102,7 @@ class _SearchViewState extends State<_SearchView> {
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.history_rounded),
+          icon: Icon(Icons.history_rounded, color: cs.onSurfaceVariant),
           tooltip: 'Chat History',
           onPressed: () async {
             final sessionId = await Navigator.push<String>(
@@ -122,7 +119,7 @@ class _SearchViewState extends State<_SearchView> {
           },
         ),
         IconButton(
-          icon: const Icon(Icons.settings_outlined),
+          icon: Icon(Icons.settings_outlined, color: cs.onSurfaceVariant),
           onPressed: () => Navigator.pushNamed(context, AppRoutes.settings),
         ),
       ],
@@ -130,23 +127,11 @@ class _SearchViewState extends State<_SearchView> {
   }
 
   Widget _buildBody(BuildContext context, SearchState state) {
-    if (state is SearchInitial) {
-      return _buildEmptyState();
-    }
-
-    if (state is SearchLoading) {
-      return _buildShimmer();
-    }
-
-    if (state is SearchError) {
-      return _buildError(context, state.message);
-    }
-
+    if (state is SearchInitial) return _buildEmptyState(context);
+    if (state is SearchLoading) return _buildShimmer(context);
+    if (state is SearchError) return _buildError(context, state.message);
     if (state is SearchLoaded) {
-      if (state.papers.isEmpty) {
-        return _buildNoResults();
-      }
-
+      if (state.papers.isEmpty) return _buildNoResults(context);
       return LoadingOverlay(
         isLoading: state.isLoadingMore,
         child: ListView.builder(
@@ -176,11 +161,11 @@ class _SearchViewState extends State<_SearchView> {
         ),
       );
     }
-
     return const SizedBox.shrink();
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -205,33 +190,34 @@ class _SearchViewState extends State<_SearchView> {
                   size: 36, color: AppColors.gradientBlue),
             ),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'Discover Research',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: cs.onSurface,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Search millions of academic papers\non arXiv to find relevant research',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary,
+                color: cs.onSurfaceVariant,
                 height: 1.5,
               ),
             ),
             const SizedBox(height: 32),
-            _buildSuggestionChips(),
+            _buildSuggestionChips(context),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSuggestionChips() {
+  Widget _buildSuggestionChips(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final suggestions = [
       'Large Language Models',
       'Diffusion Models',
@@ -240,38 +226,36 @@ class _SearchViewState extends State<_SearchView> {
       'Retrieval Augmented Generation',
     ];
 
-    return Builder(builder: (context) {
-      return Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 8,
-        runSpacing: 8,
-        children: suggestions.map((s) {
-          return GestureDetector(
-            onTap: () => context.read<SearchCubit>().search(s),
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.backgroundSecondary,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.surfaceBorder),
-              ),
-              child: Text(
-                s,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: suggestions.map((s) {
+        return GestureDetector(
+          onTap: () => context.read<SearchCubit>().search(s),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainer,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: cs.outlineVariant),
+            ),
+            child: Text(
+              s,
+              style: TextStyle(
+                fontSize: 13,
+                color: cs.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
               ),
             ),
-          );
-        }).toList(),
-      );
-    });
+          ),
+        );
+      }).toList(),
+    );
   }
 
-  Widget _buildNoResults() {
+  Widget _buildNoResults(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -280,26 +264,26 @@ class _SearchViewState extends State<_SearchView> {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: AppColors.backgroundSecondary,
+              color: cs.surfaceContainerHighest,
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.surfaceBorder),
+              border: Border.all(color: cs.outlineVariant),
             ),
-            child: const Icon(Icons.search_off_rounded,
-                size: 32, color: AppColors.textTertiary),
+            child: Icon(Icons.search_off_rounded,
+                size: 32, color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'No papers found',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: cs.onSurface,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Try different keywords or broaden your search',
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
           ),
         ],
       ),
@@ -307,6 +291,7 @@ class _SearchViewState extends State<_SearchView> {
   }
 
   Widget _buildError(BuildContext context, String message) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -317,27 +302,26 @@ class _SearchViewState extends State<_SearchView> {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.08),
+                color: AppColors.error.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.error_outline_rounded,
+              child: const Icon(Icons.error_outline_rounded,
                   size: 32, color: AppColors.error),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Something went wrong',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: cs.onSurface,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 13, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 24),
             GestureDetector(
@@ -349,7 +333,7 @@ class _SearchViewState extends State<_SearchView> {
                   gradient: const LinearGradient(
                     colors: [
                       AppColors.gradientBlue,
-                      AppColors.gradientSlateBlue
+                      AppColors.gradientSlateBlue,
                     ],
                   ),
                   borderRadius: BorderRadius.circular(20),
@@ -370,10 +354,12 @@ class _SearchViewState extends State<_SearchView> {
     );
   }
 
-  Widget _buildShimmer() {
+  Widget _buildShimmer(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Shimmer.fromColors(
-      baseColor: const Color(0xFFF3F4F6),
-      highlightColor: const Color(0xFFFFFFFF),
+      baseColor: isDark ? const Color(0xFF1F2937) : const Color(0xFFF3F4F6),
+      highlightColor:
+          isDark ? const Color(0xFF374151) : const Color(0xFFFFFFFF),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: 5,

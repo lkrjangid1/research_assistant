@@ -13,13 +13,12 @@ class PaperSelectionBar extends StatelessWidget {
     return BlocBuilder<PaperSelectionCubit, PaperSelectionState>(
       builder: (context, state) {
         if (state.selectedPapers.isEmpty) return const SizedBox.shrink();
+        final cs = Theme.of(context).colorScheme;
 
         return Container(
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            border: const Border(
-              top: BorderSide(color: AppColors.surfaceBorder),
-            ),
+            color: cs.surface,
+            border: Border(top: BorderSide(color: cs.outlineVariant)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.06),
@@ -39,17 +38,15 @@ class PaperSelectionBar extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Paper chips
                         Wrap(
                           spacing: 6,
                           runSpacing: 6,
-                          children:
-                              state.selectedPapers.map((paper) {
-                            final status =
-                                state.statusFor(paper.arxivId);
+                          children: state.selectedPapers.map((paper) {
+                            final status = state.statusFor(paper.arxivId);
                             return _PaperChip(
                               title: paper.title,
                               status: status,
+                              cs: cs,
                               onRemove: () => context
                                   .read<PaperSelectionCubit>()
                                   .removePaper(paper.arxivId),
@@ -60,23 +57,22 @@ class PaperSelectionBar extends StatelessWidget {
                           const SizedBox(height: 6),
                           Row(
                             children: [
-                              SizedBox(
+                              const SizedBox(
                                 width: 12,
                                 height: 12,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 1.5,
-                                  valueColor:
-                                      const AlwaysStoppedAnimation<Color>(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
                                     AppColors.gradientFuchsia,
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Text(
+                              Text(
                                 'Preparing papers for chat…',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: AppColors.textTertiary,
+                                  color: cs.onSurfaceVariant,
                                 ),
                               ),
                             ],
@@ -96,11 +92,10 @@ class PaperSelectionBar extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // Chat button
                   GestureDetector(
                     onTap: state.allPapersReady
-                        ? () => Navigator.pushNamed(
-                            context, AppRoutes.chat)
+                        ? () =>
+                            Navigator.pushNamed(context, AppRoutes.chat)
                         : null,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
@@ -117,7 +112,7 @@ class PaperSelectionBar extends StatelessWidget {
                             : null,
                         color: state.allPapersReady
                             ? null
-                            : const Color(0xFFE5E7EB),
+                            : cs.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: state.allPapersReady
                             ? [
@@ -138,7 +133,7 @@ class PaperSelectionBar extends StatelessWidget {
                             size: 16,
                             color: state.allPapersReady
                                 ? Colors.white
-                                : AppColors.textTertiary,
+                                : cs.onSurfaceVariant,
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -148,7 +143,7 @@ class PaperSelectionBar extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                               color: state.allPapersReady
                                   ? Colors.white
-                                  : AppColors.textTertiary,
+                                  : cs.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -168,11 +163,13 @@ class PaperSelectionBar extends StatelessWidget {
 class _PaperChip extends StatelessWidget {
   final String title;
   final String status;
+  final ColorScheme cs;
   final VoidCallback onRemove;
 
   const _PaperChip({
     required this.title,
     required this.status,
+    required this.cs,
     required this.onRemove,
   });
 
@@ -183,23 +180,22 @@ class _PaperChip extends StatelessWidget {
     final shortTitle =
         title.length > 24 ? '${title.substring(0, 24)}…' : title;
     final suffix = isProcessing
-        ? ' ·  indexing'
+        ? ' · indexing'
         : isFailed
             ? ' · failed'
             : '';
 
+    final chipColor =
+        isFailed ? AppColors.error : AppColors.gradientBlue;
+
     return Container(
-      padding: const EdgeInsets.only(left: 10, right: 4, top: 4, bottom: 4),
+      padding:
+          const EdgeInsets.only(left: 10, right: 4, top: 4, bottom: 4),
       decoration: BoxDecoration(
-        color: isFailed
-            ? AppColors.error.withValues(alpha: 0.08)
-            : AppColors.gradientBlue.withValues(alpha: 0.08),
+        color: chipColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isFailed
-              ? AppColors.error.withValues(alpha: 0.2)
-              : AppColors.gradientBlue.withValues(alpha: 0.2),
-        ),
+        border:
+            Border.all(color: chipColor.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -209,9 +205,7 @@ class _PaperChip extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              color: isFailed
-                  ? AppColors.error
-                  : AppColors.gradientBlue,
+              color: chipColor,
             ),
           ),
           const SizedBox(width: 4),
@@ -221,18 +215,11 @@ class _PaperChip extends StatelessWidget {
               width: 18,
               height: 18,
               decoration: BoxDecoration(
-                color: isFailed
-                    ? AppColors.error.withValues(alpha: 0.12)
-                    : AppColors.gradientBlue.withValues(alpha: 0.12),
+                color: chipColor.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.close_rounded,
-                size: 10,
-                color: isFailed
-                    ? AppColors.error
-                    : AppColors.gradientBlue,
-              ),
+              child: Icon(Icons.close_rounded,
+                  size: 10, color: chipColor),
             ),
           ),
         ],

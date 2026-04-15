@@ -54,6 +54,8 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: AnimatedGradientBorder(
@@ -63,13 +65,12 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
         child: Container(
           height: 56,
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: cs.surface,
             borderRadius: BorderRadius.circular(26),
           ),
           child: Row(
             children: [
               const SizedBox(width: 16),
-              // Leading icon or loader
               widget.isLoading
                   ? SizedBox(
                       width: 20,
@@ -81,10 +82,9 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                         ),
                       ),
                     )
-                  : const Icon(Icons.search_rounded,
-                      size: 20, color: AppColors.textTertiary),
+                  : Icon(Icons.search_rounded,
+                      size: 20, color: cs.onSurfaceVariant),
               const SizedBox(width: 12),
-              // Text field
               Expanded(
                 child: Focus(
                   onFocusChange: (f) => setState(() => _isFocused = f),
@@ -92,15 +92,15 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                     controller: _controller,
                     textInputAction: TextInputAction.search,
                     onSubmitted: (_) => _submit(),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w400,
-                      color: AppColors.textPrimary,
+                      color: cs.onSurface,
                     ),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'Search arXiv papers…',
                       hintStyle: TextStyle(
-                        color: AppColors.textTertiary,
+                        color: cs.onSurfaceVariant,
                         fontSize: 15,
                         fontWeight: FontWeight.w400,
                       ),
@@ -114,18 +114,16 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                   ),
                 ),
               ),
-              // Clear button
               if (_hasText)
                 GestureDetector(
                   onTap: _clear,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Icon(Icons.close_rounded,
-                        size: 18, color: AppColors.textTertiary),
+                        size: 18, color: cs.onSurfaceVariant),
                   ),
                 ),
               const SizedBox(width: 6),
-              // Send/Search button
               GestureDetector(
                 onTap: _submit,
                 child: Container(
@@ -135,7 +133,10 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: const LinearGradient(
-                      colors: [AppColors.gradientBlue, AppColors.gradientSlateBlue],
+                      colors: [
+                        AppColors.gradientBlue,
+                        AppColors.gradientSlateBlue,
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
