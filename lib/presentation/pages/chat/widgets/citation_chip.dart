@@ -11,20 +11,46 @@ class CitationChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: citation.chunkText,
+      decoration: BoxDecoration(
+        color: AppColors.textPrimary,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      textStyle: const TextStyle(
+        color: Colors.white,
+        fontSize: 12,
+      ),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: AppColors.citationHighlight,
           border: Border.all(color: AppColors.citationBorder),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(
-          '[${_shortTitle(citation.paperTitle)}, p.${citation.pageNumber}]',
-          style: TextStyle(
-            fontSize: 11,
-            color: Theme.of(context).colorScheme.primary,
-            fontWeight: FontWeight.w500,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 14,
+              height: 14,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [AppColors.gradientBlue, AppColors.gradientSlateBlue],
+                ),
+              ),
+              child: const Icon(Icons.format_quote_rounded,
+                  color: Colors.white, size: 8),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              '[${_shortTitle(citation.paperTitle)}, p.${citation.pageNumber}]',
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.gradientBlue,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

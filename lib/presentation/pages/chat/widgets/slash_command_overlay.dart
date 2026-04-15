@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/colors.dart';
 
 const _commands = [
-  ('/summary', 'Generate a summary of selected papers'),
-  ('/compare', 'Compare methodology of papers'),
-  ('/gaps', 'Identify research gaps'),
-  ('/review', 'Get a peer-review style critique'),
-  ('/code', 'Generate implementation pseudocode'),
-  ('/visualize', 'Describe charts/architecture'),
-  ('/search', 'Search for related work'),
-  ('/explain', 'Explain a concept from the papers'),
+  ('/summary', 'Generate a summary of selected papers', Icons.summarize_outlined),
+  ('/compare', 'Compare methodology of papers', Icons.compare_arrows_rounded),
+  ('/gaps', 'Identify research gaps', Icons.search_rounded),
+  ('/review', 'Get a peer-review style critique', Icons.rate_review_outlined),
+  ('/code', 'Generate implementation pseudocode', Icons.code_rounded),
+  ('/visualize', 'Describe charts/architecture', Icons.auto_graph_rounded),
+  ('/search', 'Search for related work', Icons.travel_explore_rounded),
+  ('/explain', 'Explain a concept from the papers', Icons.lightbulb_outline_rounded),
 ];
 
 class SlashCommandOverlay extends StatelessWidget {
@@ -30,31 +31,114 @@ class SlashCommandOverlay extends StatelessWidget {
 
     if (matches.isEmpty) return const SizedBox.shrink();
 
-    return Material(
-      elevation: 4,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        constraints: const BoxConstraints(maxHeight: 240),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: Theme.of(context).colorScheme.surfaceContainerHigh,
-        ),
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 280),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.surfaceBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
         child: ListView.separated(
           shrinkWrap: true,
           padding: const EdgeInsets.symmetric(vertical: 8),
           itemCount: matches.length,
-          separatorBuilder: (_, __) => const Divider(height: 1, indent: 16),
+          separatorBuilder: (_, __) =>
+              const Divider(height: 1, indent: 48, endIndent: 16),
           itemBuilder: (context, i) {
             final cmd = matches[i];
-            return ListTile(
-              dense: true,
-              leading: const Icon(Icons.terminal, size: 18),
-              title: Text(cmd.$1,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              subtitle: Text(cmd.$2, style: const TextStyle(fontSize: 11)),
+            return _CommandTile(
+              command: cmd.$1,
+              description: cmd.$2,
+              icon: cmd.$3,
               onTap: () => onSelect(cmd.$1),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _CommandTile extends StatefulWidget {
+  final String command;
+  final String description;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _CommandTile({
+    required this.command,
+    required this.description,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  State<_CommandTile> createState() => _CommandTileState();
+}
+
+class _CommandTileState extends State<_CommandTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          color: _hovered
+              ? AppColors.gradientBlue.withValues(alpha: 0.04)
+              : Colors.transparent,
+          padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.gradientBlue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(widget.icon,
+                    size: 16, color: AppColors.gradientBlue),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.command,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      widget.description,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../domain/entities/paper.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../../../../core/theme/colors.dart';
 
 class MetadataSection extends StatelessWidget {
   final Paper paper;
@@ -10,73 +11,273 @@ class MetadataSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      margin: const EdgeInsets.all(16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(paper.title,
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            _row(context, Icons.person_outline, paper.authors.join(', ')),
-            const SizedBox(height: 6),
-            _row(context, Icons.calendar_today_outlined,
-                DateFormatter.formatPublishedDate(paper.publishedDate)),
-            const SizedBox(height: 6),
-            _row(context, Icons.tag_outlined, paper.categories.join(' · ')),
-            const SizedBox(height: 6),
-            _row(context, Icons.fingerprint_outlined, paper.arxivId),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.picture_as_pdf, size: 16),
-                  label: const Text('View PDF'),
-                  onPressed: () => _launch(paper.pdfUrl),
-                ),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.open_in_new, size: 16),
-                  label: const Text('arXiv Page'),
-                  onPressed: () => _launch(
-                      'https://arxiv.org/abs/${paper.arxivId}'),
-                ),
-              ],
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.surfaceBorder),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.cardShadow,
+              blurRadius: 12,
+              offset: Offset(0, 4),
             ),
-            const Divider(height: 24),
-            Text('Abstract', style: theme.textTheme.labelLarge),
-            const SizedBox(height: 8),
-            Text(paper.abstract, style: theme.textTheme.bodyMedium),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _row(BuildContext context, IconData icon, String text) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title
+              Text(
+                paper.title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                  height: 1.4,
                 ),
+              ),
+              const SizedBox(height: 16),
+              // Metadata rows
+              _MetaRow(
+                icon: Icons.person_outline_rounded,
+                text: paper.authors.join(', '),
+              ),
+              const SizedBox(height: 8),
+              _MetaRow(
+                icon: Icons.calendar_today_outlined,
+                text: DateFormatter.formatPublishedDate(paper.publishedDate),
+              ),
+              const SizedBox(height: 8),
+              _MetaRow(
+                icon: Icons.label_outline_rounded,
+                text: paper.categories.join(' · '),
+              ),
+              const SizedBox(height: 8),
+              _MetaRow(
+                icon: Icons.fingerprint_rounded,
+                text: paper.arxivId,
+                isMonospace: true,
+              ),
+              const SizedBox(height: 16),
+              // Action buttons
+              Row(
+                children: [
+                  _ActionButton(
+                    icon: Icons.picture_as_pdf_outlined,
+                    label: 'View PDF',
+                    onTap: () => _launch(paper.pdfUrl),
+                    isPrimary: true,
+                  ),
+                  const SizedBox(width: 10),
+                  _ActionButton(
+                    icon: Icons.open_in_new_rounded,
+                    label: 'arXiv Page',
+                    onTap: () =>
+                        _launch('https://arxiv.org/abs/${paper.arxivId}'),
+                    isPrimary: false,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // Abstract divider
+              Container(
+                width: double.infinity,
+                height: 1,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Color(0x00F3F4F6),
+                      AppColors.surfaceBorder,
+                      Color(0x00F3F4F6),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          AppColors.gradientBlue,
+                          AppColors.gradientPurple,
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Abstract',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                paper.abstract,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                  height: 1.7,
+                ),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 
   Future<void> _launch(String url) async {
     final uri = Uri.parse(url);
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+class _MetaRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool isMonospace;
+
+  const _MetaRow({
+    required this.icon,
+    required this.text,
+    this.isMonospace = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: AppColors.gradientBlue.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Icon(icon, size: 14, color: AppColors.gradientBlue),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                fontFamily: isMonospace ? 'monospace' : null,
+                fontWeight: isMonospace ? FontWeight.w500 : FontWeight.w400,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionButton extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isPrimary;
+
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.isPrimary,
+  });
+
+  @override
+  State<_ActionButton> createState() => _ActionButtonState();
+}
+
+class _ActionButtonState extends State<_ActionButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          decoration: BoxDecoration(
+            gradient: widget.isPrimary
+                ? LinearGradient(
+                    colors: _hovered
+                        ? [
+                            const Color(0xFF5A95F5),
+                            const Color(0xFF8B7AEF),
+                          ]
+                        : [
+                            AppColors.gradientBlue,
+                            AppColors.gradientSlateBlue,
+                          ],
+                  )
+                : null,
+            color: widget.isPrimary ? null : AppColors.backgroundSecondary,
+            borderRadius: BorderRadius.circular(20),
+            border: widget.isPrimary
+                ? null
+                : Border.all(color: AppColors.surfaceBorder),
+            boxShadow: widget.isPrimary
+                ? [
+                    BoxShadow(
+                      color: AppColors.gradientBlue.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                widget.icon,
+                size: 15,
+                color: widget.isPrimary
+                    ? Colors.white
+                    : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: widget.isPrimary
+                      ? Colors.white
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

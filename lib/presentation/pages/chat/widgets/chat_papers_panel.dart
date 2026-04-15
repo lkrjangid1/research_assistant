@@ -5,6 +5,7 @@ import '../../../cubits/chat/chat_cubit.dart';
 import '../../../cubits/chat/chat_state.dart';
 import '../../../cubits/paper_selection/paper_selection_cubit.dart';
 import '../../../../app/routes.dart';
+import '../../../../core/theme/colors.dart';
 
 class ChatPapersPanel extends StatefulWidget {
   const ChatPapersPanel({super.key});
@@ -24,7 +25,7 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 250),
       value: 1.0,
     );
     _sizeAnimation = CurvedAnimation(
@@ -46,8 +47,6 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
 
   @override
   Widget build(BuildContext context) {
-    // Use sessionPapers from ChatCubit — correct for both new and historical sessions.
-    // Fall back to PaperSelectionCubit only when the chat session hasn't loaded yet.
     return BlocBuilder<ChatCubit, ChatState>(
       builder: (context, chatState) {
         final papers = chatState is ChatSessionLoaded
@@ -56,86 +55,102 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
 
         if (papers.isEmpty) return const SizedBox.shrink();
 
-        final theme = Theme.of(context);
         final selState = context.watch<PaperSelectionCubit>().state;
         final hasIndexing = chatState is ChatSessionLoaded
-            ? false // historical sessions are already indexed
+            ? false
             : selState.hasProcessingPapers;
 
         return Container(
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerLow,
-            border: Border(
-              bottom: BorderSide(
-                  color: theme.colorScheme.outlineVariant, width: 1),
+            color: AppColors.surface,
+            border: const Border(
+              bottom: BorderSide(color: AppColors.surfaceBorder),
             ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── Header ──────────────────────────────────────────────────────
+              // Header
               InkWell(
                 onTap: _toggle,
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
                     children: [
-                      Icon(Icons.article_outlined,
-                          size: 16, color: theme.colorScheme.primary),
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              AppColors.gradientBlue,
+                              AppColors.gradientPurple,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(Icons.article_rounded,
+                            color: Colors.white, size: 13),
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         '${papers.length} paper${papers.length > 1 ? 's' : ''} in context',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.primary,
+                        style: const TextStyle(
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       const Spacer(),
                       if (hasIndexing)
                         Padding(
-                          padding: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.only(right: 10),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               SizedBox(
-                                width: 10,
-                                height: 10,
+                                width: 12,
+                                height: 12,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 1.5,
-                                  color: theme.colorScheme.tertiary,
+                                  valueColor:
+                                      const AlwaysStoppedAnimation<Color>(
+                                    AppColors.gradientFuchsia,
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 4),
-                              Text('Indexing…',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                      color: theme.colorScheme.tertiary)),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Indexing…',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.gradientFuchsia,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ],
                           ),
                         ),
                       AnimatedRotation(
                         turns: _expanded ? 0 : -0.5,
-                        duration: const Duration(milliseconds: 200),
-                        child: Icon(Icons.expand_less,
-                            size: 20,
-                            color: theme.colorScheme.onSurfaceVariant),
+                        duration: const Duration(milliseconds: 250),
+                        child: const Icon(Icons.expand_less_rounded,
+                            size: 20, color: AppColors.textTertiary),
                       ),
                     ],
                   ),
                 ),
               ),
-              // ── Paper list ──────────────────────────────────────────────────
+              // Paper list
               SizeTransition(
                 sizeFactor: _sizeAnimation,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: papers.map((p) {
-                    // Show the remove button only when the paper is in the
-                    // *current* selection — i.e. we're in a live session.
                     final canRemove = selState.isSelected(p.arxivId);
-                    final status = canRemove
-                        ? selState.statusFor(p.arxivId)
-                        : 'completed';
+                    final status =
+                        canRemove ? selState.statusFor(p.arxivId) : 'completed';
                     return _PaperRow(
                       paper: p,
                       status: status,
@@ -165,8 +180,6 @@ class _PaperRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return InkWell(
       onTap: () => Navigator.pushNamed(
         context,
@@ -177,14 +190,22 @@ class _PaperRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
         child: Row(
           children: [
-            // Status dot
+            // Status indicator
             Container(
               width: 8,
               height: 8,
               margin: const EdgeInsets.only(right: 10),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _statusColor(context, status),
+                color: _statusColor(status),
+                boxShadow: status == 'completed'
+                    ? [
+                        BoxShadow(
+                          color: AppColors.success.withValues(alpha: 0.4),
+                          blurRadius: 4,
+                        )
+                      ]
+                    : null,
               ),
             ),
             // Paper info
@@ -197,8 +218,11 @@ class _PaperRow extends StatelessWidget {
                     paper.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                   if (paper.authors.isNotEmpty)
                     Text(
@@ -206,26 +230,26 @@ class _PaperRow extends StatelessWidget {
                           (paper.authors.length > 2 ? ' et al.' : ''),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textTertiary,
+                      ),
                     ),
                 ],
               ),
             ),
-            // Status badge (only for non-ready papers)
             _StatusBadge(status: status),
-            // Remove button only for live-session papers
             if (canRemove)
               IconButton(
-                icon: const Icon(Icons.close, size: 16),
+                icon: const Icon(Icons.close_rounded, size: 16),
                 tooltip: 'Remove from chat',
                 visualDensity: VisualDensity.compact,
+                color: AppColors.textTertiary,
                 onPressed: () => context
                     .read<PaperSelectionCubit>()
                     .removePaper(paper.arxivId),
               )
             else
-              // Spacer to keep alignment consistent
               const SizedBox(width: 40),
           ],
         ),
@@ -233,13 +257,12 @@ class _PaperRow extends StatelessWidget {
     );
   }
 
-  Color _statusColor(BuildContext context, String status) {
-    final cs = Theme.of(context).colorScheme;
+  Color _statusColor(String status) {
     return switch (status) {
-      'completed' => Colors.green,
-      'processing' => cs.tertiary,
-      'failed' => cs.error,
-      _ => cs.outlineVariant,
+      'completed' => AppColors.success,
+      'processing' => AppColors.gradientFuchsia,
+      'failed' => AppColors.error,
+      _ => AppColors.textTertiary,
     };
   }
 }
@@ -250,29 +273,33 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (status == 'completed' || status == 'idle') return const SizedBox.shrink();
+    if (status == 'completed' || status == 'idle') {
+      return const SizedBox.shrink();
+    }
 
-    final theme = Theme.of(context);
     final (label, color) = switch (status) {
-      'processing' => ('Indexing', theme.colorScheme.tertiary),
-      'failed' => ('Failed', theme.colorScheme.error),
-      _ => ('', theme.colorScheme.outlineVariant),
+      'processing' => ('Indexing', AppColors.gradientFuchsia),
+      'failed' => ('Failed', AppColors.error),
+      _ => ('', AppColors.textTertiary),
     };
 
     if (label.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       margin: const EdgeInsets.only(right: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,
         style: TextStyle(
-            fontSize: 10, color: color, fontWeight: FontWeight.w600),
+          fontSize: 10,
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

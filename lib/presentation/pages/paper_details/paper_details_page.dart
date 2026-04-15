@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection_container.dart';
+import '../../../core/theme/colors.dart';
 import '../../../domain/entities/paper.dart';
 import '../../cubits/paper_details/paper_details_cubit.dart';
 import '../../cubits/paper_selection/paper_selection_cubit.dart';
 import '../../cubits/paper_selection/paper_selection_state.dart';
+import '../../widgets/gradient_orbs_background.dart';
 import 'widgets/metadata_section.dart';
 import 'widgets/summary_card.dart';
 import '../../../app/routes.dart';
@@ -31,49 +33,142 @@ class _PaperDetailsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Paper Details'),
-        actions: [
-          BlocBuilder<PaperSelectionCubit, PaperSelectionState>(
-            builder: (context, state) {
-              final isSelected = state.isSelected(paper.arxivId);
-              return IconButton(
-                icon: Icon(
-                  isSelected ? Icons.check_circle : Icons.add_circle_outline,
-                  color: isSelected
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
-                ),
-                tooltip: isSelected ? 'Remove from chat' : 'Add to chat',
-                onPressed: () {
-                  if (isSelected) {
-                    context.read<PaperSelectionCubit>().removePaper(paper.arxivId);
-                  } else if (state.canAddMore) {
-                    context.read<PaperSelectionCubit>().addPaper(paper);
-                  }
-                },
-              );
-            },
-          ),
-        ],
-      ),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: MetadataSection(paper: paper)),
-          const SliverToBoxAdapter(child: SummaryCard()),
-          const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
-        ],
+      backgroundColor: AppColors.background,
+      appBar: _buildAppBar(context),
+      body: GradientOrbsBackground(
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: MetadataSection(paper: paper)),
+            const SliverToBoxAdapter(child: SummaryCard()),
+            const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
+          ],
+        ),
       ),
       floatingActionButton: BlocBuilder<PaperSelectionCubit, PaperSelectionState>(
         builder: (context, state) {
           if (!state.isSelected(paper.arxivId)) return const SizedBox.shrink();
-          return FloatingActionButton.extended(
-            onPressed: () => Navigator.pushNamed(context, AppRoutes.chat),
-            icon: const Icon(Icons.chat),
-            label: const Text('Open Chat'),
+          return Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.gradientBlue, AppColors.gradientSlateBlue],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.gradientBlue.withValues(alpha: 0.3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => Navigator.pushNamed(context, AppRoutes.chat),
+                borderRadius: BorderRadius.circular(16),
+                child: const Padding(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.chat_bubble_outline_rounded,
+                          color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Open Chat',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           );
         },
       ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    return AppBar(
+      backgroundColor: AppColors.surface,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_rounded,
+            color: AppColors.textSecondary),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: const Text('Paper Details'),
+      actions: [
+        BlocBuilder<PaperSelectionCubit, PaperSelectionState>(
+          builder: (context, state) {
+            final isSelected = state.isSelected(paper.arxivId);
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: () {
+                  if (isSelected) {
+                    context
+                        .read<PaperSelectionCubit>()
+                        .removePaper(paper.arxivId);
+                  } else if (state.canAddMore) {
+                    context.read<PaperSelectionCubit>().addPaper(paper);
+                  }
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  decoration: BoxDecoration(
+                    gradient: isSelected
+                        ? const LinearGradient(
+                            colors: [
+                              AppColors.gradientBlue,
+                              AppColors.gradientSlateBlue,
+                            ],
+                          )
+                        : null,
+                    color: isSelected ? null : AppColors.backgroundSecondary,
+                    borderRadius: BorderRadius.circular(20),
+                    border: isSelected
+                        ? null
+                        : Border.all(color: AppColors.surfaceBorder),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isSelected
+                            ? Icons.check_rounded
+                            : Icons.add_rounded,
+                        size: 15,
+                        color: isSelected
+                            ? Colors.white
+                            : AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isSelected ? 'In Chat' : 'Add to Chat',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isSelected
+                              ? Colors.white
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
