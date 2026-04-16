@@ -184,6 +184,72 @@ class ChatCubit extends Cubit<ChatState> {
     }
   }
 
+  void clearMessages() {
+    _messages.clear();
+    _session = _session.copyWith(
+      messages: const [],
+      updatedAt: DateTime.now(),
+    );
+    final current = state;
+    if (current is ChatSessionLoaded) {
+      emit(current.copyWith(messages: const []));
+      _persistSession();
+    }
+  }
+
+  Future<void> regenerateLastResponse(Map<String, String> paperTitles) async {
+    final currentState = state;
+    if (currentState is! ChatSessionLoaded || currentState.isProcessing) return;
+
+    // Find the last user message
+    final lastUserIdx = _messages.lastIndexWhere((m) => m.isUser);
+    if (lastUserIdx < 0) return;
+
+    final content = _messages[lastUserIdx].content;
+
+    // Remove all messages after the last user message (the AI response)
+    if (_messages.length > lastUserIdx + 1) {
+      _messages.removeRange(lastUserIdx + 1, _messages.length);
+    }
+    _session = _session.copyWith(
+      messages: List.from(_messages),
+      updatedAt: DateTime.now(),
+    );
+
+    emit(currentState.copyWith(messages: List.from(_messages), isProcessing: true));
+
+    // Re-send via the appropriate path
+    final isSlash = content.trimLeft().startsWith('/');
+    final result = isSlash
+        ? await _processCommand(
+            rawCommand: content.trim(),
+            paperIds: _session.paperIds,
+            paperTitles: paperTitles,
+            sessionId: _session.sessionId,
+          )
+        : await _sendMessage(
+            question: content,
+            paperIds: _session.paperIds,
+            paperTitles: paperTitles,
+            sessionId: _session.sessionId,
+          );
+
+    result.fold(
+      (failure) => emit(currentState.copyWith(
+        messages: List.from(_messages),
+        isProcessing: false,
+      )),
+      (response) {
+        _addMessage(response);
+        _persistSession();
+        emit(currentState.copyWith(
+          messages: List.from(_messages),
+          isProcessing: false,
+        ));
+      },
+    );
+  }
+
   void _addMessage(Message msg) {
     if (_messages.length >= AppConstants.maxChatMessages) {
       _messages.removeAt(0);

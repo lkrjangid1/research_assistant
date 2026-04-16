@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../../domain/entities/message.dart';
 import '../../../../core/utils/date_formatter.dart';
@@ -186,18 +187,103 @@ class _AiBubble extends StatelessWidget {
             ),
           ),
         ),
-        if (message.citations != null && message.citations!.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 8, left: 4),
-            child: Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              children: message.citations!
-                  .map((c) => CitationChip(citation: c))
-                  .toList(),
-            ),
+        // Action row + Citations
+        Padding(
+          padding: const EdgeInsets.only(top: 8, left: 4),
+          child: Row(
+            children: [
+              _BubbleAction(
+                icon: Icons.copy_rounded,
+                label: 'Copy',
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: message.content));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Copied to clipboard'),
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 1),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                  );
+                },
+              ),
+              if (message.citations != null && message.citations!.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: message.citations!
+                          .map((c) => Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: CitationChip(citation: c),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
+        ),
       ],
+    );
+  }
+}
+
+class _BubbleAction extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _BubbleAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  State<_BubbleAction> createState() => _BubbleActionState();
+}
+
+class _BubbleActionState extends State<_BubbleAction> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: widget.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: _pressed
+              ? AppColors.gradientBlue.withValues(alpha: 0.1)
+              : cs.surfaceContainer,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: cs.outlineVariant),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(widget.icon, size: 13, color: cs.onSurfaceVariant),
+            const SizedBox(width: 4),
+            Text(
+              widget.label,
+              style: TextStyle(
+                fontSize: 11,
+                color: cs.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

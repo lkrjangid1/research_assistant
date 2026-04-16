@@ -48,12 +48,28 @@ class _ChatViewState extends State<_ChatView> {
   bool _showSlashOverlay = false;
   String _slashQuery = '';
   bool _inputFocused = false;
+  bool _showScrollDown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScrollChanged);
+  }
 
   @override
   void dispose() {
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScrollChanged() {
+    if (!_scrollController.hasClients) return;
+    final atBottom = _scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 100;
+    if (_showScrollDown == atBottom) {
+      setState(() => _showScrollDown = !atBottom);
+    }
   }
 
   void _onTextChanged(String text) {
@@ -81,6 +97,42 @@ class _ChatViewState extends State<_ChatView> {
         _slashQuery = '/';
       }
     });
+  }
+
+  void _regenerate(BuildContext context) {
+    final chatState = context.read<ChatCubit>().state;
+    if (chatState is! ChatSessionLoaded) return;
+    final titles = chatState.isResumedSession
+        ? chatState.session.paperTitles
+        : context.read<PaperSelectionCubit>().state.paperTitles;
+    context.read<ChatCubit>().regenerateLastResponse(titles);
+  }
+
+  Future<void> _confirmClearChat(BuildContext context) async {
+    final cs = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Clear Chat?',
+            style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w700)),
+        content: Text('All messages in this session will be removed.',
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: TextStyle(color: cs.onSurfaceVariant)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Clear',
+                style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      context.read<ChatCubit>().clearMessages();
+    }
   }
 
   void _sendMessage(BuildContext context) {
@@ -132,7 +184,39 @@ class _ChatViewState extends State<_ChatView> {
         children: [
           const ChatPapersPanel(),
           _buildIndexingBanner(context, cs),
-          Expanded(child: _buildMessageList(context, cs)),
+          Expanded(
+            child: Stack(
+              children: [
+                _buildMessageList(context, cs),
+                if (_showScrollDown)
+                  Positioned(
+                    bottom: 8,
+                    right: 16,
+                    child: GestureDetector(
+                      onTap: _scrollToBottom,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: cs.surfaceContainer,
+                          border: Border.all(color: cs.outlineVariant),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Icon(Icons.keyboard_arrow_down_rounded,
+                            size: 22, color: cs.onSurfaceVariant),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
           if (_showSlashOverlay)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -172,6 +256,11 @@ class _ChatViewState extends State<_ChatView> {
         ],
       ),
       actions: [
+        IconButton(
+          icon: Icon(Icons.delete_outline_rounded, color: cs.onSurfaceVariant),
+          tooltip: 'Clear Chat',
+          onPressed: () => _confirmClearChat(context),
+        ),
         IconButton(
           icon: Icon(Icons.history_rounded, color: cs.onSurfaceVariant),
           tooltip: 'Chat History',
@@ -281,15 +370,28 @@ class _ChatViewState extends State<_ChatView> {
           if (state.messages.isEmpty) {
             return _buildEmptyChat(context, cs);
           }
+          // Show regenerate button after the last AI message when idle
+          final showRegenerate = !state.isProcessing &&
+              state.messages.isNotEmpty &&
+              state.messages.last.isAssistant;
+          final extraCount =
+              (state.isProcessing ? 1 : 0) + (showRegenerate ? 1 : 0);
+
           return ListView.builder(
             controller: _scrollController,
             padding: const EdgeInsets.symmetric(vertical: 12),
-            itemCount: state.messages.length + (state.isProcessing ? 1 : 0),
+            itemCount: state.messages.length + extraCount,
             itemBuilder: (context, i) {
-              if (i == state.messages.length) {
+              // Message bubbles
+              if (i < state.messages.length) {
+                return MessageBubble(message: state.messages[i]);
+              }
+              // Thinking indicator (while processing)
+              if (state.isProcessing && i == state.messages.length) {
                 return _buildThinkingIndicator(cs);
               }
-              return MessageBubble(message: state.messages[i]);
+              // Regenerate button
+              return _buildRegenerateButton(context, cs);
             },
           );
         }
@@ -401,6 +503,45 @@ class _ChatViewState extends State<_ChatView> {
     );
   }
 
+  Widget _buildRegenerateButton(BuildContext context, ColorScheme cs) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: [
+        IntrinsicWidth(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16), // minimal outer padding
+            child: GestureDetector(
+              onTap: () => _regenerate(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainer,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: cs.outlineVariant),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min, // 👈 THIS is key
+                  children: [
+                    Icon(Icons.refresh_rounded, size: 15, color: cs.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Regenerate response',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildInputBar(BuildContext context, ColorScheme cs) {
     return BlocBuilder<ChatCubit, ChatState>(
       builder: (context, state) {
@@ -469,7 +610,8 @@ class _ChatViewState extends State<_ChatView> {
                             controller: _inputController,
                             onChanged: _onTextChanged,
                             enabled: inputEnabled,
-                            maxLines: 1,
+                            minLines: 1,
+                            maxLines: 4,
                             textInputAction: TextInputAction.send,
                             onSubmitted: (_) => _sendMessage(context),
                             style: TextStyle(
