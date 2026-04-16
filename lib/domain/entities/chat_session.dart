@@ -19,13 +19,14 @@ class ChatSession extends Equatable {
   });
 
   ChatSession copyWith({
+    List<String>? paperIds,
+    Map<String, String>? paperTitles,
     List<Message>? messages,
     DateTime? updatedAt,
-    Map<String, String>? paperTitles,
   }) {
     return ChatSession(
       sessionId: sessionId,
-      paperIds: paperIds,
+      paperIds: paperIds ?? this.paperIds,
       paperTitles: paperTitles ?? this.paperTitles,
       messages: messages ?? this.messages,
       createdAt: createdAt,

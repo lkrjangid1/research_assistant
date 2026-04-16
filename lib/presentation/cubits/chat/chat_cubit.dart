@@ -60,6 +60,7 @@ class ChatCubit extends Cubit<ChatState> {
             session: _session,
             messages: List.from(_messages),
             sessionPapers: papers,
+            isResumedSession: true,
           ));
         }
       },
@@ -144,6 +145,43 @@ class ChatCubit extends Cubit<ChatState> {
         ));
       },
     );
+  }
+
+  void addPaperToSession(Paper paper) {
+    if (_session.paperIds.contains(paper.arxivId)) return;
+    if (_session.paperIds.length >= AppConstants.maxPapersPerSession) return;
+
+    _session = _session.copyWith(
+      paperIds: [..._session.paperIds, paper.arxivId],
+      paperTitles: {..._session.paperTitles, paper.arxivId: paper.title},
+      updatedAt: DateTime.now(),
+    );
+
+    final current = state;
+    if (current is ChatSessionLoaded) {
+      emit(current.copyWith(sessionPapers: [...current.sessionPapers, paper]));
+      _persistSession();
+    }
+  }
+
+  void removePaperFromSession(String arxivId) {
+    if (!_session.paperIds.contains(arxivId)) return;
+
+    final newIds = _session.paperIds.where((id) => id != arxivId).toList();
+    final newTitles = Map<String, String>.from(_session.paperTitles)..remove(arxivId);
+    _session = _session.copyWith(
+      paperIds: newIds,
+      paperTitles: newTitles,
+      updatedAt: DateTime.now(),
+    );
+
+    final current = state;
+    if (current is ChatSessionLoaded) {
+      emit(current.copyWith(
+        sessionPapers: current.sessionPapers.where((p) => p.arxivId != arxivId).toList(),
+      ));
+      _persistSession();
+    }
   }
 
   void _addMessage(Message msg) {

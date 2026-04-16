@@ -24,15 +24,38 @@ class PaperSelectionCubit extends Cubit<PaperSelectionState> {
         .put(paper.arxivId, PaperModel.fromEntity(paper));
 
     final nextPapers = [...state.selectedPapers, paper];
-    final nextStatuses = Map<String, String>.from(state.paperStatuses)
-      ..[paper.arxivId] = 'processing';
 
+    // Show processing immediately so the UI responds without delay
     emit(state.copyWith(
       selectedPapers: nextPapers,
-      paperStatuses: nextStatuses,
+      paperStatuses: Map<String, String>.from(state.paperStatuses)
+        ..[paper.arxivId] = 'processing',
       error: null,
     ));
 
+    // Skip re-indexing if the backend already has this paper
+    final statusResult = await _paperRepository.getPaperStatus(paper.arxivId);
+    final existingStatus = statusResult.fold(
+      (failure) => null,
+      (status) => (status['status'] as String?)?.toLowerCase(),
+    );
+
+    if (existingStatus == 'completed') {
+      emit(state.copyWith(
+        paperStatuses: Map<String, String>.from(state.paperStatuses)
+          ..[paper.arxivId] = 'completed',
+        error: null,
+      ));
+      return;
+    }
+
+    if (existingStatus == 'processing') {
+      // Backend is already working on it — just wait
+      await _pollUntilReady(paper.arxivId);
+      return;
+    }
+
+    // Not indexed yet — trigger full processing
     final processResult = await _paperRepository.processPaper(
       arxivId: paper.arxivId,
       title: paper.title,
@@ -66,8 +89,15 @@ class PaperSelectionCubit extends Cubit<PaperSelectionState> {
       {for (final p in state.selectedPapers) p.arxivId: p.title};
 
   Future<void> _pollUntilReady(String paperId) async {
-    for (var attempt = 0; attempt < 30; attempt++) {
-      await Future<void>.delayed(const Duration(seconds: 2));
+    for (var attempt = 0; attempt < 40; attempt++) {
+      // Progressive backoff: 1s for first 3 polls (catches fast indexing),
+      // then 3s up to poll 10, then 5s for the long tail (large PDF downloads).
+      final delay = attempt < 3
+          ? const Duration(seconds: 1)
+          : attempt < 10
+              ? const Duration(seconds: 3)
+              : const Duration(seconds: 5);
+      await Future<void>.delayed(delay);
       final result = await _paperRepository.getPaperStatus(paperId);
 
       final shouldStop = result.fold(

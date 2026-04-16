@@ -77,9 +77,15 @@ class _ChatViewState extends State<_ChatView> {
   void _sendMessage(BuildContext context) {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
-    final selectionState = context.read<PaperSelectionCubit>().state;
-    if (!selectionState.allPapersReady) return;
-    context.read<ChatCubit>().sendMessage(text, selectionState.paperTitles);
+    final chatState = context.read<ChatCubit>().state;
+    if (chatState is ChatSessionLoaded && chatState.isResumedSession) {
+      // History session: papers already indexed — use the session's own titles
+      context.read<ChatCubit>().sendMessage(text, chatState.session.paperTitles);
+    } else {
+      final selectionState = context.read<PaperSelectionCubit>().state;
+      if (!selectionState.allPapersReady) return;
+      context.read<ChatCubit>().sendMessage(text, selectionState.paperTitles);
+    }
     _inputController.clear();
     setState(() => _showSlashOverlay = false);
     _scrollToBottom();
@@ -169,6 +175,13 @@ class _ChatViewState extends State<_ChatView> {
   Widget _buildIndexingBanner(BuildContext context, ColorScheme cs) {
     return BlocBuilder<PaperSelectionCubit, PaperSelectionState>(
       builder: (context, selState) {
+        final chatState = context.watch<ChatCubit>().state;
+        // History sessions with no newly attached papers: nothing to index
+        if (chatState is ChatSessionLoaded &&
+            chatState.isResumedSession &&
+            !selState.hasProcessingPapers) {
+          return const SizedBox.shrink();
+        }
         if (selState.selectedPapers.isEmpty || selState.allPapersReady) {
           return const SizedBox.shrink();
         }
@@ -385,7 +398,12 @@ class _ChatViewState extends State<_ChatView> {
         final isProcessing =
             state is ChatSessionLoaded && state.isProcessing;
         final selectionState = context.watch<PaperSelectionCubit>().state;
-        final inputEnabled = !isProcessing && selectionState.allPapersReady;
+        final isResumed = state is ChatSessionLoaded && state.isResumedSession;
+        // For history sessions: allow input unless a newly attached paper is still indexing.
+        // For new sessions: require all selected papers to be ready.
+        final inputEnabled = !isProcessing &&
+            (isResumed && !selectionState.hasProcessingPapers ||
+                selectionState.allPapersReady);
 
         return Container(
           decoration: BoxDecoration(
@@ -424,7 +442,7 @@ class _ChatViewState extends State<_ChatView> {
                               color: cs.onSurface,
                             ),
                             decoration: InputDecoration(
-                              hintText: selectionState.allPapersReady
+                              hintText: inputEnabled
                                   ? 'Ask anything or type / for commands'
                                   : 'Waiting for paper indexing…',
                               hintStyle: TextStyle(

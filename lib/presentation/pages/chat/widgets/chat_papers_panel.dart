@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../domain/entities/paper.dart';
 import '../../../cubits/chat/chat_cubit.dart';
 import '../../../cubits/chat/chat_state.dart';
@@ -45,6 +46,28 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
     _expanded ? _animController.forward() : _animController.reverse();
   }
 
+  /// Navigate to search so the user can pick an additional paper.
+  /// Any paper added to PaperSelectionCubit during that visit is synced
+  /// into the current chat session on return.
+  Future<void> _attachPaper(BuildContext context) async {
+    final selCubit = context.read<PaperSelectionCubit>();
+    final chatCubit = context.read<ChatCubit>();
+    final papersBefore =
+        selCubit.state.selectedPapers.map((p) => p.arxivId).toSet();
+
+    await Navigator.pushNamed(context, AppRoutes.search);
+
+    if (!context.mounted) return;
+
+    final newPapers = selCubit.state.selectedPapers
+        .where((p) => !papersBefore.contains(p.arxivId))
+        .toList();
+
+    for (final paper in newPapers) {
+      chatCubit.addPaperToSession(paper);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -58,9 +81,9 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
         if (papers.isEmpty) return const SizedBox.shrink();
 
         final selState = context.watch<PaperSelectionCubit>().state;
-        final hasIndexing = chatState is ChatSessionLoaded
-            ? false
-            : selState.hasProcessingPapers;
+        // Show indexing indicator when any paper is still being processed
+        final hasIndexing = selState.hasProcessingPapers;
+        final canAddMore = papers.length < AppConstants.maxPapersPerSession;
 
         return Container(
           decoration: BoxDecoration(
@@ -104,7 +127,7 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
                       const Spacer(),
                       if (hasIndexing)
                         Padding(
-                          padding: const EdgeInsets.only(right: 10),
+                          padding: const EdgeInsets.only(right: 6),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -130,6 +153,36 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
                             ],
                           ),
                         ),
+                      // Attach paper button
+                      if (canAddMore)
+                        Tooltip(
+                          message: 'Add paper',
+                          child: InkWell(
+                            onTap: () => _attachPaper(context),
+                            borderRadius: BorderRadius.circular(6),
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.attach_file_rounded,
+                                      size: 14, color: cs.primary),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'Attach',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: cs.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(width: 4),
                       AnimatedRotation(
                         turns: _expanded ? 0 : -0.5,
                         duration: const Duration(milliseconds: 250),
@@ -145,10 +198,13 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: papers.map((p) {
-                    final canRemove = selState.isSelected(p.arxivId);
-                    final status = canRemove
+                    // Status: use live value from PaperSelectionCubit if available,
+                    // otherwise the paper was loaded from history and is already indexed.
+                    final status = selState.isSelected(p.arxivId)
                         ? selState.statusFor(p.arxivId)
                         : 'completed';
+                    // Can remove as long as the session has more than one paper
+                    final canRemove = papers.length > 1;
                     return _PaperRow(
                       paper: p,
                       status: status,
@@ -229,18 +285,26 @@ class _PaperRow extends StatelessWidget {
               ),
             ),
             _StatusBadge(status: status),
-            if (canRemove)
-              IconButton(
-                icon: Icon(Icons.close_rounded,
-                    size: 16, color: cs.onSurfaceVariant),
-                tooltip: 'Remove from chat',
-                visualDensity: VisualDensity.compact,
-                onPressed: () => context
-                    .read<PaperSelectionCubit>()
-                    .removePaper(paper.arxivId),
-              )
-            else
-              const SizedBox(width: 40),
+            IconButton(
+              icon: Icon(
+                Icons.close_rounded,
+                size: 16,
+                color: canRemove ? cs.onSurfaceVariant : cs.onSurfaceVariant.withValues(alpha: 0.3),
+              ),
+              tooltip: canRemove ? 'Remove from chat' : 'Cannot remove last paper',
+              visualDensity: VisualDensity.compact,
+              onPressed: canRemove
+                  ? () {
+                      // Remove from session state (works for both new and history sessions)
+                      context.read<ChatCubit>().removePaperFromSession(paper.arxivId);
+                      // Also remove from PaperSelectionCubit if it's currently selected
+                      final selCubit = context.read<PaperSelectionCubit>();
+                      if (selCubit.state.isSelected(paper.arxivId)) {
+                        selCubit.removePaper(paper.arxivId);
+                      }
+                    }
+                  : null,
+            ),
           ],
         ),
       ),

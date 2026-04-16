@@ -18,12 +18,15 @@ class ChatSessionLoaded extends ChatState {
   final List<Message> messages;
   final List<Paper> sessionPapers;
   final bool isProcessing;
+  // True when session was resumed from history (papers already indexed on backend)
+  final bool isResumedSession;
 
   const ChatSessionLoaded({
     required this.session,
     required this.messages,
     this.sessionPapers = const [],
     this.isProcessing = false,
+    this.isResumedSession = false,
   });
 
   ChatSessionLoaded copyWith({
@@ -36,11 +39,12 @@ class ChatSessionLoaded extends ChatState {
       messages: messages ?? this.messages,
       sessionPapers: sessionPapers ?? this.sessionPapers,
       isProcessing: isProcessing ?? this.isProcessing,
+      isResumedSession: isResumedSession,
     );
   }
 
   @override
-  List<Object?> get props => [session, messages, sessionPapers, isProcessing];
+  List<Object?> get props => [session, messages, sessionPapers, isProcessing, isResumedSession];
 }
 
 class ChatError extends ChatState {
