@@ -74,6 +74,15 @@ class _ChatViewState extends State<_ChatView> {
     setState(() => _showSlashOverlay = false);
   }
 
+  void _toggleCommandMenu() {
+    setState(() {
+      _showSlashOverlay = !_showSlashOverlay;
+      if (_showSlashOverlay) {
+        _slashQuery = '/';
+      }
+    });
+  }
+
   void _sendMessage(BuildContext context) {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
@@ -425,7 +434,33 @@ class _ChatViewState extends State<_ChatView> {
                   ),
                   child: Row(
                     children: [
-                      const SizedBox(width: 16),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: GestureDetector(
+                          onTap: inputEnabled ? _toggleCommandMenu : null,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _showSlashOverlay
+                                  ? AppColors.gradientBlue.withValues(alpha: 0.12)
+                                  : Colors.transparent,
+                            ),
+                            child: Icon(
+                              Icons.terminal_rounded,
+                              size: 18,
+                              color: inputEnabled
+                                  ? (_showSlashOverlay
+                                      ? AppColors.gradientBlue
+                                      : cs.onSurfaceVariant)
+                                  : cs.onSurfaceVariant.withValues(alpha: 0.4),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
                       Expanded(
                         child: Focus(
                           onFocusChange: (f) =>
