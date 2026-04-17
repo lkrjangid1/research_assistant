@@ -46,3 +46,5 @@ app.*.map.json
 /.venv
 */service-account.json
 */.env
+/.dartServer
+/.dart-tool
