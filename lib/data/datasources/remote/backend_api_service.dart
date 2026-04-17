@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_exceptions.dart';
 
 class BackendApiService {
@@ -51,6 +52,27 @@ class BackendApiService {
     });
   }
 
+  Future<Map<String, dynamic>> uploadPaperPdf({
+    required List<int> pdfBytes,
+    required String filename,
+    String? title,
+  }) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(pdfBytes, filename: filename),
+        if (title != null) 'title': title,
+      });
+      final r = await _dio.post(
+        ApiConstants.papersUpload,
+        data: formData,
+        options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+      );
+      return r.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      _handleDioError(e);
+    }
+  }
+
   Future<Map<String, dynamic>> getPaperStatus(String paperId) async {
     return _get('/api/papers/$paperId/status');
   }
@@ -69,7 +91,8 @@ class BackendApiService {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> _post(
+      String path, Map<String, dynamic> data) async {
     try {
       final r = await _dio.post(path, data: data);
       return r.data as Map<String, dynamic>;
@@ -88,13 +111,20 @@ class BackendApiService {
   }
 
   Never _handleDioError(DioException e) {
-    if (e.response?.statusCode == 404) throw ServerException('Not found', statusCode: 404);
-    if (e.response?.statusCode == 422) throw ServerException('Validation error', statusCode: 422);
+    if (e.response?.statusCode == 404) {
+      throw ServerException('Not found', statusCode: 404);
+    }
+    if (e.response?.statusCode == 422) {
+      throw ServerException('Validation error', statusCode: 422);
+    }
     if (e.type == DioExceptionType.connectionTimeout ||
         e.type == DioExceptionType.receiveTimeout) {
       throw const TimeoutException();
     }
-    if (e.type == DioExceptionType.connectionError) throw const NetworkException();
-    throw ServerException(e.message ?? 'Server error', statusCode: e.response?.statusCode);
+    if (e.type == DioExceptionType.connectionError) {
+      throw const NetworkException();
+    }
+    throw ServerException(e.message ?? 'Server error',
+        statusCode: e.response?.statusCode);
   }
 }

@@ -55,3 +55,50 @@ def test_chat_command(test_client):
     assert r.status_code == 200
     data = r.json()
     assert "command" in data
+
+
+def test_upload_paper_pdf_success(
+    test_client,
+    sample_pdf_bytes,
+    pdf_processor,
+    chunker,
+    vector_store,
+    mock_embedding_service,
+    monkeypatch,
+    tmp_path,
+):
+    from app.api.routes import papers
+
+    monkeypatch.setattr(papers, "_PDF_CACHE_DIR", tmp_path / "pdf_cache")
+    monkeypatch.setattr(papers, "get_pdf_processor", lambda: pdf_processor)
+    monkeypatch.setattr(papers, "get_chunker", lambda: chunker)
+    monkeypatch.setattr(papers, "get_embedding_service", lambda: mock_embedding_service)
+    monkeypatch.setattr(papers, "get_vector_store", lambda: vector_store)
+
+    response = test_client.post(
+        "/api/papers/upload",
+        files={"file": ("test-paper.pdf", sample_pdf_bytes, "application/pdf")},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["paper_id"].startswith("upload-")
+    assert data["title"] == "test-paper"
+    assert data["status"] == "processing"
+
+    paper_id = data["paper_id"]
+
+    status = test_client.get(f"/api/papers/{paper_id}/status")
+    assert status.status_code == 200
+    assert status.json()["status"] == "completed"
+
+    pdf = test_client.get(f"/api/papers/{paper_id}/pdf")
+    assert pdf.status_code == 200
+    assert pdf.headers["content-type"] == "application/pdf"
+
+
+def test_upload_paper_rejects_non_pdf(test_client):
+    response = test_client.post(
+        "/api/papers/upload",
+        files={"file": ("notes.txt", b"not a pdf", "text/plain")},
+    )
+    assert response.status_code == 400

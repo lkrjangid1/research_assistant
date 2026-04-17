@@ -18,6 +18,12 @@ abstract class PaperRepository {
     required String pdfUrl,
   });
 
+  Future<Either<Failure, Map<String, dynamic>>> uploadPaperPdf({
+    required List<int> pdfBytes,
+    required String filename,
+    String? title,
+  });
+
   Future<Either<Failure, Map<String, dynamic>>> getPaperStatus(String paperId);
 
   Future<Either<Failure, String>> getSummary({

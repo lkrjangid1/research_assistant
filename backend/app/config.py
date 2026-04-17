@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
     gemini_model: str = Field(default="gemini-2.5-flash-lite", alias="GEMINI_MODEL")
     embedding_model: str = Field(default="gemini-embedding-001", alias="EMBEDDING_MODEL")
+    embedding_dim: int = Field(default=256, alias="EMBEDDING_DIM")
+    embedding_cache_path: str = Field(default="./data/embedding_cache.pkl", alias="EMBEDDING_CACHE_PATH")
     faiss_index_path: str = Field(default="./data/faiss_index", alias="FAISS_INDEX_PATH")
     debug: bool = Field(default=False, alias="DEBUG")
     cors_origins: str = Field(default="*", alias="CORS_ORIGINS")

@@ -66,7 +66,30 @@ class PaperRepositoryImpl implements PaperRepository {
   }
 
   @override
-  Future<Either<Failure, Map<String, dynamic>>> getPaperStatus(String paperId) async {
+  Future<Either<Failure, Map<String, dynamic>>> uploadPaperPdf({
+    required List<int> pdfBytes,
+    required String filename,
+    String? title,
+  }) async {
+    try {
+      final result = await _backendApi.uploadPaperPdf(
+        pdfBytes: pdfBytes,
+        filename: filename,
+        title: title,
+      );
+      return Right(result);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure('Failed to upload PDF: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Map<String, dynamic>>> getPaperStatus(
+      String paperId) async {
     try {
       final result = await _backendApi.getPaperStatus(paperId);
       return Right(result);

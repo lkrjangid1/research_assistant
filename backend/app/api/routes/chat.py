@@ -1,6 +1,6 @@
 import uuid
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends
 from app.models.requests import (
     ChatQueryRequest, ChatQueryResponse, CitationResponse,
     SlashCommandRequest, SlashCommandResponse,
@@ -12,8 +12,10 @@ router = APIRouter(prefix="/api/chat", tags=["Chat"])
 
 
 @router.post("/query", response_model=ChatQueryResponse)
-async def chat_query(request: ChatQueryRequest):
-    rag = get_rag_service()
+async def chat_query(
+    request: ChatQueryRequest,
+    rag=Depends(get_rag_service),
+):
     result = await rag.query(
         question=request.question,
         paper_ids=request.paper_ids,
@@ -35,8 +37,10 @@ async def chat_query(request: ChatQueryRequest):
 
 
 @router.post("/command", response_model=SlashCommandResponse)
-async def chat_command(request: SlashCommandRequest):
-    rag = get_rag_service()
+async def chat_command(
+    request: SlashCommandRequest,
+    rag=Depends(get_rag_service),
+):
     result = await rag.execute_command(
         command=request.command,
         args=request.args,

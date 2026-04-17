@@ -7,7 +7,9 @@ class ApiConstants {
   static const String chatQuery = '/api/chat/query';
   static const String chatCommand = '/api/chat/command';
   static const String papersProcess = '/api/papers/process';
+  static const String papersUpload = '/api/papers/upload';
   static const String papersStatus = '/api/papers/{id}/status';
+  static const String papersPdf = '/api/papers/{id}/pdf';
   static const String summaryGenerate = '/api/summary/generate';
   static const String health = '/health';
 }

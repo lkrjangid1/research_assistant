@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from app.config import get_settings
 from app.models.paper import PaperStatus, ProcessingStatus
@@ -37,13 +38,15 @@ def get_embedding_service() -> EmbeddingService:
     return EmbeddingService(
         api_key=settings.gemini_api_key,
         model_name=settings.embedding_model,
+        embedding_dim=settings.embedding_dim,
+        cache_path=Path(settings.embedding_cache_path),
     )
 
 
 @lru_cache
 def get_vector_store() -> VectorStore:
     settings = get_settings()
-    return VectorStore(embedding_dim=768, index_path=settings.faiss_index_dir)
+    return VectorStore(embedding_dim=settings.embedding_dim, index_path=settings.faiss_index_dir)
 
 
 @lru_cache

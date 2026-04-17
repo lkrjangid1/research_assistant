@@ -12,6 +12,9 @@ class MetadataSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isUploadedPaper = paper.arxivId.startsWith('upload-');
+    final hasAuthors = paper.authors.isNotEmpty;
+    final hasCategories = paper.categories.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -43,19 +46,32 @@ class MetadataSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              _MetaRow(icon: Icons.person_outline_rounded,
-                  text: paper.authors.join(', '), cs: cs),
-              const SizedBox(height: 8),
+              if (hasAuthors) ...[
+                _MetaRow(
+                  icon: Icons.person_outline_rounded,
+                  text: paper.authors.join(', '),
+                  cs: cs,
+                ),
+                const SizedBox(height: 8),
+              ],
               _MetaRow(
                   icon: Icons.calendar_today_outlined,
                   text: DateFormatter.formatPublishedDate(paper.publishedDate),
                   cs: cs),
+              if (hasCategories) ...[
+                const SizedBox(height: 8),
+                _MetaRow(
+                  icon: Icons.label_outline_rounded,
+                  text: paper.categories.join(' · '),
+                  cs: cs,
+                ),
+              ],
               const SizedBox(height: 8),
-              _MetaRow(icon: Icons.label_outline_rounded,
-                  text: paper.categories.join(' · '), cs: cs),
-              const SizedBox(height: 8),
-              _MetaRow(icon: Icons.fingerprint_rounded,
-                  text: paper.arxivId, cs: cs, isMonospace: true),
+              _MetaRow(
+                  icon: Icons.fingerprint_rounded,
+                  text: paper.arxivId,
+                  cs: cs,
+                  isMonospace: true),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -65,14 +81,16 @@ class MetadataSection extends StatelessWidget {
                     onTap: () => _launch(paper.pdfUrl),
                     isPrimary: true,
                   ),
-                  const SizedBox(width: 10),
-                  _ActionButton(
-                    icon: Icons.open_in_new_rounded,
-                    label: 'arXiv Page',
-                    onTap: () =>
-                        _launch('https://arxiv.org/abs/${paper.arxivId}'),
-                    isPrimary: false,
-                  ),
+                  if (!isUploadedPaper) ...[
+                    const SizedBox(width: 10),
+                    _ActionButton(
+                      icon: Icons.open_in_new_rounded,
+                      label: 'arXiv Page',
+                      onTap: () =>
+                          _launch('https://arxiv.org/abs/${paper.arxivId}'),
+                      isPrimary: false,
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 20),
@@ -165,8 +183,7 @@ class _MetaRow extends StatelessWidget {
                 fontSize: 13,
                 color: cs.onSurfaceVariant,
                 fontFamily: isMonospace ? 'monospace' : null,
-                fontWeight:
-                    isMonospace ? FontWeight.w500 : FontWeight.w400,
+                fontWeight: isMonospace ? FontWeight.w500 : FontWeight.w400,
               ),
             ),
           ),
@@ -220,14 +237,12 @@ class _ActionButtonState extends State<_ActionButton> {
                 : null,
             color: widget.isPrimary ? null : cs.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(20),
-            border: widget.isPrimary
-                ? null
-                : Border.all(color: cs.outlineVariant),
+            border:
+                widget.isPrimary ? null : Border.all(color: cs.outlineVariant),
             boxShadow: widget.isPrimary
                 ? [
                     BoxShadow(
-                      color:
-                          AppColors.gradientBlue.withValues(alpha: 0.25),
+                      color: AppColors.gradientBlue.withValues(alpha: 0.25),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -248,9 +263,7 @@ class _ActionButtonState extends State<_ActionButton> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: widget.isPrimary
-                      ? Colors.white
-                      : cs.onSurfaceVariant,
+                  color: widget.isPrimary ? Colors.white : cs.onSurfaceVariant,
                 ),
               ),
             ],

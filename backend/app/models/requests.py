@@ -17,6 +17,14 @@ class ProcessPaperResponse(BaseModel):
     message: str
 
 
+class UploadPaperResponse(BaseModel):
+    paper_id: str
+    title: str
+    pdf_url: str
+    status: str
+    message: str
+
+
 class PaperStatusResponse(BaseModel):
     paper_id: str
     status: str

@@ -14,7 +14,7 @@ class SemanticChunker:
 
     def __init__(
         self,
-        chunk_size: int = 512,       # tokens
+        chunk_size: int = 1024,      # tokens (larger → fewer chunks → lower embed cost)
         chunk_overlap: int = 50,      # tokens
         separator: str = "\n\n",
         chars_per_token: int = 4,
@@ -23,7 +23,7 @@ class SemanticChunker:
         self.chunk_overlap = chunk_overlap
         self.separator = separator
         self.chars_per_token = chars_per_token
-        self._max_chars = chunk_size * chars_per_token          # 2048
+        self._max_chars = chunk_size * chars_per_token          # 4096
         self._overlap_chars = chunk_overlap * chars_per_token   # 200
 
     def chunk_document(self, pages: list[ExtractedPage], paper_id: str) -> list[Chunk]:

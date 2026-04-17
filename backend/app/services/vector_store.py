@@ -179,7 +179,15 @@ class VectorStore:
         if not index_file.exists():
             logger.info("No FAISS index found at %s — starting fresh", self.index_path)
             return
-        self.index = faiss.read_index(str(index_file))
+        loaded_index = faiss.read_index(str(index_file))
+        # Dimension mismatch → embedding model changed; discard stale vectors
+        if loaded_index.d != self.embedding_dim:
+            logger.warning(
+                "Index dimension %d != configured %d — discarding old index",
+                loaded_index.d, self.embedding_dim,
+            )
+            return
+        self.index = loaded_index
         with open(meta_file, "rb") as f:
             data = pickle.load(f)
         self.metadata = data["metadata"]

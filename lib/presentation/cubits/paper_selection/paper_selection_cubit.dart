@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive/hive.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../core/constants/hive_keys.dart';
 import '../../../domain/repositories/paper_repository.dart';
 import '../../../data/models/paper_model.dart';
@@ -9,12 +10,67 @@ import '../../../domain/entities/paper.dart';
 
 class PaperSelectionCubit extends Cubit<PaperSelectionState> {
   final PaperRepository _paperRepository;
+  static const _uploadedPaperAbstract =
+      'User-uploaded PDF indexed for chat. Ask questions in chat to explore the full document.';
 
-  PaperSelectionCubit(this._paperRepository) : super(PaperSelectionState.initial());
+  PaperSelectionCubit(this._paperRepository)
+      : super(PaperSelectionState.initial());
+
+  Future<Paper?> uploadPdf({
+    required String filename,
+    required List<int> pdfBytes,
+  }) async {
+    if (state.selectedPapers.length >= AppConstants.maxPapersPerSession) {
+      emit(state.copyWith(
+          error: 'Maximum ${AppConstants.maxPapersPerSession} papers allowed'));
+      return null;
+    }
+
+    final uploadResult = await _paperRepository.uploadPaperPdf(
+      pdfBytes: pdfBytes,
+      filename: filename,
+    );
+
+    return await uploadResult.fold(
+      (failure) async {
+        emit(state.copyWith(error: failure.message));
+        return null;
+      },
+      (data) async {
+        final paperId = data['paper_id'] as String;
+        Paper? existingPaper;
+        for (final paper in state.selectedPapers) {
+          if (paper.arxivId == paperId) {
+            existingPaper = paper;
+            break;
+          }
+        }
+        if (existingPaper != null) {
+          return existingPaper;
+        }
+
+        final paper = Paper(
+          arxivId: paperId,
+          title: (data['title'] as String?)?.trim().isNotEmpty == true
+              ? data['title'] as String
+              : filename.replaceFirst(
+                  RegExp(r'\.pdf$', caseSensitive: false), ''),
+          authors: const [],
+          abstract: _uploadedPaperAbstract,
+          pdfUrl: '${ApiConstants.backendBaseUrl}${data['pdf_url'] as String}',
+          publishedDate: DateTime.now(),
+          categories: const ['Uploaded PDF'],
+        );
+        await addPaper(paper);
+        return paper;
+      },
+    );
+  }
 
   Future<void> addPaper(Paper paper) async {
     if (state.selectedPapers.length >= AppConstants.maxPapersPerSession) {
-      emit(state.copyWith(error: 'Maximum ${AppConstants.maxPapersPerSession} papers allowed'));
+      emit(state.copyWith(
+          error: 'Maximum ${AppConstants.maxPapersPerSession} papers allowed'));
       return;
     }
     if (state.selectedPapers.any((p) => p.arxivId == paper.arxivId)) return;
@@ -75,7 +131,8 @@ class PaperSelectionCubit extends Cubit<PaperSelectionState> {
     final nextStatuses = Map<String, String>.from(state.paperStatuses)
       ..remove(arxivId);
     emit(state.copyWith(
-      selectedPapers: state.selectedPapers.where((p) => p.arxivId != arxivId).toList(),
+      selectedPapers:
+          state.selectedPapers.where((p) => p.arxivId != arxivId).toList(),
       paperStatuses: nextStatuses,
       error: null,
     ));
@@ -83,7 +140,8 @@ class PaperSelectionCubit extends Cubit<PaperSelectionState> {
 
   void clearAll() => emit(PaperSelectionState.initial());
 
-  bool isSelected(String arxivId) => state.selectedPapers.any((p) => p.arxivId == arxivId);
+  bool isSelected(String arxivId) =>
+      state.selectedPapers.any((p) => p.arxivId == arxivId);
 
   Map<String, String> get paperTitles =>
       {for (final p in state.selectedPapers) p.arxivId: p.title};
@@ -106,7 +164,8 @@ class PaperSelectionCubit extends Cubit<PaperSelectionState> {
           return true;
         },
         (status) {
-          final statusValue = (status['status'] as String? ?? 'processing').toLowerCase();
+          final statusValue =
+              (status['status'] as String? ?? 'processing').toLowerCase();
           final nextStatuses = Map<String, String>.from(state.paperStatuses)
             ..[paperId] = statusValue;
           emit(state.copyWith(paperStatuses: nextStatuses, error: null));
@@ -115,7 +174,8 @@ class PaperSelectionCubit extends Cubit<PaperSelectionState> {
             return true;
           }
           if (statusValue == 'failed') {
-            final message = status['error_message'] as String? ?? 'Paper indexing failed';
+            final message =
+                status['error_message'] as String? ?? 'Paper indexing failed';
             _markFailure(paperId, message);
             return true;
           }

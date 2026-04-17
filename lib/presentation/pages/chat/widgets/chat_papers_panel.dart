@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -18,6 +19,7 @@ class ChatPapersPanel extends StatefulWidget {
 class _ChatPapersPanelState extends State<ChatPapersPanel>
     with SingleTickerProviderStateMixin {
   bool _expanded = true;
+  bool _isUploadingPdf = false;
   late final AnimationController _animController;
   late final Animation<double> _sizeAnimation;
 
@@ -49,7 +51,7 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
   /// Navigate to search so the user can pick an additional paper.
   /// Any paper added to PaperSelectionCubit during that visit is synced
   /// into the current chat session on return.
-  Future<void> _attachPaper(BuildContext context) async {
+  Future<void> _attachPaper() async {
     final selCubit = context.read<PaperSelectionCubit>();
     final chatCubit = context.read<ChatCubit>();
     final papersBefore =
@@ -66,6 +68,89 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
     for (final paper in newPapers) {
       chatCubit.addPaperToSession(paper);
     }
+  }
+
+  Future<void> _showAttachOptions() async {
+    final choice = await showModalBottomSheet<_AttachOption>(
+      context: context,
+      builder: (sheetContext) {
+        final cs = Theme.of(sheetContext).colorScheme;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _AttachOptionTile(
+                icon: Icons.search_rounded,
+                title: 'Add arXiv paper',
+                subtitle: 'Search and attach another indexed paper',
+                color: AppColors.gradientBlue,
+                cs: cs,
+                onTap: () => Navigator.pop(sheetContext, _AttachOption.search),
+              ),
+              _AttachOptionTile(
+                icon: Icons.picture_as_pdf_rounded,
+                title: 'Upload PDF',
+                subtitle:
+                    'Pick a paper PDF from this device and index it for chat',
+                color: AppColors.gradientFuchsia,
+                cs: cs,
+                onTap: () => Navigator.pop(sheetContext, _AttachOption.upload),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted || choice == null) return;
+    if (choice == _AttachOption.search) {
+      await _attachPaper();
+      return;
+    }
+    await _uploadPdf();
+  }
+
+  Future<void> _uploadPdf() async {
+    if (_isUploadingPdf) return;
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf'],
+      withData: true,
+    );
+    if (!mounted || result == null || result.files.isEmpty) return;
+
+    final file = result.files.single;
+    final bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not read the selected PDF file.')),
+      );
+      return;
+    }
+
+    setState(() => _isUploadingPdf = true);
+    final selectionCubit = context.read<PaperSelectionCubit>();
+    final chatCubit = context.read<ChatCubit>();
+    final paper = await selectionCubit.uploadPdf(
+      filename: file.name,
+      pdfBytes: bytes,
+    );
+
+    if (!mounted) return;
+    setState(() => _isUploadingPdf = false);
+
+    if (paper == null) {
+      final error = selectionCubit.state.error ?? 'Failed to upload PDF';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+
+    chatCubit.addPaperToSession(paper);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${paper.title} added to chat context')),
+    );
   }
 
   @override
@@ -96,8 +181,8 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
               InkWell(
                 onTap: _toggle,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
                     children: [
                       Container(
@@ -158,19 +243,31 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
                         Tooltip(
                           message: 'Add paper',
                           child: InkWell(
-                            onTap: () => _attachPaper(context),
+                            onTap: _isUploadingPdf ? null : _showAttachOptions,
                             borderRadius: BorderRadius.circular(6),
                             child: Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 4),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.attach_file_rounded,
-                                      size: 14, color: cs.primary),
+                                  _isUploadingPdf
+                                      ? SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 1.6,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                              cs.primary,
+                                            ),
+                                          ),
+                                        )
+                                      : Icon(Icons.attach_file_rounded,
+                                          size: 14, color: cs.primary),
                                   const SizedBox(width: 3),
                                   Text(
-                                    'Attach',
+                                    _isUploadingPdf ? 'Uploading' : 'Attach',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: cs.primary,
@@ -217,6 +314,57 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
           ),
         );
       },
+    );
+  }
+}
+
+enum _AttachOption { search, upload }
+
+class _AttachOptionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final ColorScheme cs;
+  final VoidCallback onTap;
+
+  const _AttachOptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.cs,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: color, size: 20),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: cs.onSurface,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          fontSize: 12,
+          color: cs.onSurfaceVariant,
+        ),
+      ),
+      onTap: onTap,
     );
   }
 }
@@ -289,14 +437,19 @@ class _PaperRow extends StatelessWidget {
               icon: Icon(
                 Icons.close_rounded,
                 size: 16,
-                color: canRemove ? cs.onSurfaceVariant : cs.onSurfaceVariant.withValues(alpha: 0.3),
+                color: canRemove
+                    ? cs.onSurfaceVariant
+                    : cs.onSurfaceVariant.withValues(alpha: 0.3),
               ),
-              tooltip: canRemove ? 'Remove from chat' : 'Cannot remove last paper',
+              tooltip:
+                  canRemove ? 'Remove from chat' : 'Cannot remove last paper',
               visualDensity: VisualDensity.compact,
               onPressed: canRemove
                   ? () {
                       // Remove from session state (works for both new and history sessions)
-                      context.read<ChatCubit>().removePaperFromSession(paper.arxivId);
+                      context
+                          .read<ChatCubit>()
+                          .removePaperFromSession(paper.arxivId);
                       // Also remove from PaperSelectionCubit if it's currently selected
                       final selCubit = context.read<PaperSelectionCubit>();
                       if (selCubit.state.isSelected(paper.arxivId)) {
