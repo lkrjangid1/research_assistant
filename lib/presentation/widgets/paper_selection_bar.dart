@@ -4,6 +4,7 @@ import '../cubits/paper_selection/paper_selection_cubit.dart';
 import '../cubits/paper_selection/paper_selection_state.dart';
 import '../../app/routes.dart';
 import '../../core/theme/colors.dart';
+import '../../core/utils/file_size_formatter.dart';
 
 class PaperSelectionBar extends StatelessWidget {
   const PaperSelectionBar({super.key});
@@ -14,6 +15,14 @@ class PaperSelectionBar extends StatelessWidget {
       builder: (context, state) {
         if (state.selectedPapers.isEmpty) return const SizedBox.shrink();
         final cs = Theme.of(context).colorScheme;
+        PaperIndexingProgress? activeProgress;
+        for (final paper in state.selectedPapers) {
+          if (state.statusFor(paper.arxivId) == 'processing') {
+            activeProgress = state.progressFor(paper.arxivId);
+            break;
+          }
+        }
+        final progressLabel = _progressLabel(activeProgress);
 
         return Container(
           decoration: BoxDecoration(
@@ -29,8 +38,7 @@ class PaperSelectionBar extends StatelessWidget {
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
                   Expanded(
@@ -43,9 +51,13 @@ class PaperSelectionBar extends StatelessWidget {
                           runSpacing: 6,
                           children: state.selectedPapers.map((paper) {
                             final status = state.statusFor(paper.arxivId);
+                            final progress = state.progressFor(paper.arxivId);
                             return _PaperChip(
                               title: paper.title,
                               status: status,
+                              progress: progress,
+                              pdfSizeBytes:
+                                  progress?.pdfSizeBytes ?? paper.pdfSizeBytes,
                               cs: cs,
                               onRemove: () => context
                                   .read<PaperSelectionCubit>()
@@ -69,7 +81,7 @@ class PaperSelectionBar extends StatelessWidget {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                'Preparing papers for chat…',
+                                progressLabel,
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: cs.onSurfaceVariant,
@@ -94,8 +106,7 @@ class PaperSelectionBar extends StatelessWidget {
                   const SizedBox(width: 12),
                   GestureDetector(
                     onTap: state.allPapersReady
-                        ? () =>
-                            Navigator.pushNamed(context, AppRoutes.chat)
+                        ? () => Navigator.pushNamed(context, AppRoutes.chat)
                         : null,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
@@ -158,17 +169,36 @@ class PaperSelectionBar extends StatelessWidget {
       },
     );
   }
+
+  String _progressLabel(PaperIndexingProgress? progress) {
+    if (progress == null || progress.chunkLabel.isEmpty) {
+      return 'Preparing papers for chat...';
+    }
+    final eta = progress.etaLabel;
+    final remaining = progress.remainingChunks;
+    final suffix = [
+      if (remaining > 0) '$remaining remaining',
+      if (eta.isNotEmpty) eta,
+    ].join(' · ');
+    return suffix.isEmpty
+        ? 'Indexed ${progress.chunkLabel}'
+        : 'Indexed ${progress.chunkLabel} · $suffix';
+  }
 }
 
 class _PaperChip extends StatelessWidget {
   final String title;
   final String status;
+  final PaperIndexingProgress? progress;
+  final int? pdfSizeBytes;
   final ColorScheme cs;
   final VoidCallback onRemove;
 
   const _PaperChip({
     required this.title,
     required this.status,
+    required this.progress,
+    required this.pdfSizeBytes,
     required this.cs,
     required this.onRemove,
   });
@@ -177,25 +207,27 @@ class _PaperChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final isProcessing = status == 'processing';
     final isFailed = status == 'failed';
-    final shortTitle =
-        title.length > 24 ? '${title.substring(0, 24)}…' : title;
+    final shortTitle = title.length > 24 ? '${title.substring(0, 24)}…' : title;
+    final sizeLabel = FileSizeFormatter.formatBytes(pdfSizeBytes);
+    final progressLabel = progress?.chunkLabel ?? '';
     final suffix = isProcessing
-        ? ' · indexing'
+        ? progressLabel.isNotEmpty
+            ? ' · $progressLabel'
+            : ' · indexing'
         : isFailed
             ? ' · failed'
-            : '';
+            : sizeLabel.isNotEmpty
+                ? ' · $sizeLabel'
+                : '';
 
-    final chipColor =
-        isFailed ? AppColors.error : AppColors.gradientBlue;
+    final chipColor = isFailed ? AppColors.error : AppColors.gradientBlue;
 
     return Container(
-      padding:
-          const EdgeInsets.only(left: 10, right: 4, top: 4, bottom: 4),
+      padding: const EdgeInsets.only(left: 10, right: 4, top: 4, bottom: 4),
       decoration: BoxDecoration(
         color: chipColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
-        border:
-            Border.all(color: chipColor.withValues(alpha: 0.2)),
+        border: Border.all(color: chipColor.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -218,8 +250,7 @@ class _PaperChip extends StatelessWidget {
                 color: chipColor.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.close_rounded,
-                  size: 10, color: chipColor),
+              child: Icon(Icons.close_rounded, size: 10, color: chipColor),
             ),
           ),
         ],

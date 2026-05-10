@@ -77,6 +77,16 @@ class BackendApiService {
     return _get('/api/papers/$paperId/status');
   }
 
+  Future<Map<String, dynamic>> getPdfSize({
+    required String pdfUrl,
+    String? paperId,
+  }) async {
+    return _get('/api/papers/pdf-size', queryParameters: {
+      'pdf_url': pdfUrl,
+      if (paperId != null) 'paper_id': paperId,
+    });
+  }
+
   Future<Map<String, dynamic>> generateSummary({
     required String paperId,
     required String content,
@@ -101,9 +111,12 @@ class BackendApiService {
     }
   }
 
-  Future<Map<String, dynamic>> _get(String path) async {
+  Future<Map<String, dynamic>> _get(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
-      final r = await _dio.get(path);
+      final r = await _dio.get(path, queryParameters: queryParameters);
       return r.data as Map<String, dynamic>;
     } on DioException catch (e) {
       _handleDioError(e);

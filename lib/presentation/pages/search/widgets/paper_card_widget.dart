@@ -4,6 +4,7 @@ import '../../../../domain/entities/paper.dart';
 import '../../../cubits/paper_selection/paper_selection_cubit.dart';
 import '../../../cubits/paper_selection/paper_selection_state.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../../../../core/utils/file_size_formatter.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../app/routes.dart';
 
@@ -19,6 +20,7 @@ class PaperCardWidget extends StatelessWidget {
         final isSelected = selectionState.isSelected(paper.arxivId);
         final canAdd = selectionState.canAddMore;
         final status = selectionState.statusFor(paper.arxivId);
+        final progress = selectionState.progressFor(paper.arxivId);
         final isProcessing = status == 'processing';
         final hasFailed = status == 'failed';
 
@@ -30,6 +32,7 @@ class PaperCardWidget extends StatelessWidget {
             canAdd: canAdd,
             isProcessing: isProcessing,
             hasFailed: hasFailed,
+            progress: progress,
           ),
         );
       },
@@ -43,6 +46,7 @@ class _PaperCardContent extends StatefulWidget {
   final bool canAdd;
   final bool isProcessing;
   final bool hasFailed;
+  final PaperIndexingProgress? progress;
 
   const _PaperCardContent({
     required this.paper,
@@ -50,6 +54,7 @@ class _PaperCardContent extends StatefulWidget {
     required this.canAdd,
     required this.isProcessing,
     required this.hasFailed,
+    required this.progress,
   });
 
   @override
@@ -60,8 +65,32 @@ class _PaperCardContentState extends State<_PaperCardContent> {
   bool _hovered = false;
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _ensurePdfSize();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PaperCardContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.paper.arxivId != widget.paper.arxivId) {
+      _ensurePdfSize();
+    }
+  }
+
+  void _ensurePdfSize() {
+    if (widget.paper.pdfSizeBytes != null) return;
+    context.read<PaperSelectionCubit>().ensurePdfSize(widget.paper);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final pdfSize = widget.progress?.pdfSizeBytes ?? widget.paper.pdfSizeBytes;
+    final sizeLabel = FileSizeFormatter.formatBytes(pdfSize);
+    final effectivePaper = pdfSize == null
+        ? widget.paper
+        : widget.paper.copyWith(pdfSizeBytes: pdfSize);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -80,8 +109,7 @@ class _PaperCardContentState extends State<_PaperCardContent> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(
-                  alpha: _hovered ? 0.08 : 0.04),
+              color: Colors.black.withValues(alpha: _hovered ? 0.08 : 0.04),
               blurRadius: _hovered ? 24 : 8,
               offset: Offset(0, _hovered ? 8 : 2),
             ),
@@ -91,7 +119,7 @@ class _PaperCardContentState extends State<_PaperCardContent> {
           onTap: () => Navigator.pushNamed(
             context,
             AppRoutes.paperDetails,
-            arguments: widget.paper,
+            arguments: effectivePaper,
           ),
           borderRadius: BorderRadius.circular(20),
           child: Padding(
@@ -148,23 +176,26 @@ class _PaperCardContentState extends State<_PaperCardContent> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 10),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Icon(Icons.calendar_today_outlined,
-                        size: 12, color: cs.onSurfaceVariant),
-                    const SizedBox(width: 4),
-                    Text(
-                      DateFormatter.formatPublishedDate(
-                          widget.paper.publishedDate),
-                      style: TextStyle(
-                          fontSize: 12, color: cs.onSurfaceVariant),
+                    _MetaPill(
+                      icon: Icons.calendar_today_outlined,
+                      label: DateFormatter.formatPublishedDate(
+                        widget.paper.publishedDate,
+                      ),
+                      color: cs.onSurfaceVariant,
                     ),
-                    const SizedBox(width: 12),
+                    if (sizeLabel.isNotEmpty)
+                      _MetaPill(
+                        icon: Icons.picture_as_pdf_outlined,
+                        label: sizeLabel,
+                        color: AppColors.gradientFuchsia,
+                      ),
                     ...widget.paper.categories.take(2).map(
-                          (cat) => Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: _CategoryTag(label: cat),
-                          ),
+                          (cat) => _CategoryTag(label: cat),
                         ),
                   ],
                 ),
@@ -198,7 +229,7 @@ class _PaperCardContentState extends State<_PaperCardContent> {
                           onTap: widget.canAdd
                               ? () => context
                                   .read<PaperSelectionCubit>()
-                                  .addPaper(widget.paper)
+                                  .addPaper(effectivePaper)
                               : null,
                         ),
                 ),
@@ -231,6 +262,33 @@ class _CategoryTag extends StatelessWidget {
           fontWeight: FontWeight.w500,
         ),
       ),
+    );
+  }
+}
+
+class _MetaPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _MetaPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: color),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(fontSize: 12, color: color),
+        ),
+      ],
     );
   }
 }
@@ -298,8 +356,7 @@ class _RemoveButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.error.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: AppColors.error.withValues(alpha: 0.2)),
+          border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

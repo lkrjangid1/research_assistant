@@ -313,7 +313,7 @@ Examples:
 Run with an explicit backend URL:
 
 ```bash
-flutter run --dart-define=BACKEND_URL=http://10.0.2.2:8000
+flutter run --dart-define=BACKEND_URL=http://10.188.22.231:8971
 ```
 
 If you do not pass a value, the default is Android-emulator friendly:

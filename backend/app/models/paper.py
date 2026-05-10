@@ -24,4 +24,8 @@ class PaperStatus(BaseModel):
     paper_id: str
     status: ProcessingStatus
     total_chunks: int = 0
+    processed_chunks: int = 0
+    current_step: str = ""
+    estimated_seconds_remaining: int | None = None
+    pdf_size_bytes: int | None = None
     error_message: str | None = None

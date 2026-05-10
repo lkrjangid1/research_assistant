@@ -26,6 +26,11 @@ abstract class PaperRepository {
 
   Future<Either<Failure, Map<String, dynamic>>> getPaperStatus(String paperId);
 
+  Future<Either<Failure, Map<String, dynamic>>> getPdfSize({
+    required String pdfUrl,
+    String? paperId,
+  });
+
   Future<Either<Failure, String>> getSummary({
     required String paperId,
     required String content,

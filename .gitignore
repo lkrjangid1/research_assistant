@@ -45,6 +45,9 @@ app.*.map.json
 /android/app/release
 /.venv
 */service-account.json
+backend/*.json
 */.env
 /.dartServer
 /.dart-tool
+
+google-cloud-sdk

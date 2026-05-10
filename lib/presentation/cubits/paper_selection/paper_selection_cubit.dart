@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive/hive.dart';
 import '../../../core/constants/app_constants.dart';
@@ -10,6 +12,7 @@ import '../../../domain/entities/paper.dart';
 
 class PaperSelectionCubit extends Cubit<PaperSelectionState> {
   final PaperRepository _paperRepository;
+  final Set<String> _sizeLookupsInFlight = <String>{};
   static const _uploadedPaperAbstract =
       'User-uploaded PDF indexed for chat. Ask questions in chat to explore the full document.';
 
@@ -60,6 +63,8 @@ class PaperSelectionCubit extends Cubit<PaperSelectionState> {
           pdfUrl: '${ApiConstants.backendBaseUrl}${data['pdf_url'] as String}',
           publishedDate: DateTime.now(),
           categories: const ['Uploaded PDF'],
+          pdfSizeBytes:
+              (data['pdf_size_bytes'] as num?)?.toInt() ?? pdfBytes.length,
         );
         await addPaper(paper);
         return paper;
@@ -86,22 +91,32 @@ class PaperSelectionCubit extends Cubit<PaperSelectionState> {
       selectedPapers: nextPapers,
       paperStatuses: Map<String, String>.from(state.paperStatuses)
         ..[paper.arxivId] = 'processing',
+      paperProgress: Map<String, PaperIndexingProgress>.from(
+        state.paperProgress,
+      )..[paper.arxivId] = PaperIndexingProgress(
+          status: 'processing',
+          currentStep: 'queued',
+          pdfSizeBytes: paper.pdfSizeBytes,
+        ),
       error: null,
     ));
 
+    if (paper.pdfSizeBytes == null) {
+      unawaited(ensurePdfSize(paper));
+    }
+
     // Skip re-indexing if the backend already has this paper
     final statusResult = await _paperRepository.getPaperStatus(paper.arxivId);
-    final existingStatus = statusResult.fold(
+    String? existingStatus;
+    statusResult.fold(
       (failure) => null,
-      (status) => (status['status'] as String?)?.toLowerCase(),
+      (status) {
+        existingStatus = _applyStatusPayload(paper.arxivId, status);
+        return null;
+      },
     );
 
     if (existingStatus == 'completed') {
-      emit(state.copyWith(
-        paperStatuses: Map<String, String>.from(state.paperStatuses)
-          ..[paper.arxivId] = 'completed',
-        error: null,
-      ));
       return;
     }
 
@@ -130,10 +145,14 @@ class PaperSelectionCubit extends Cubit<PaperSelectionState> {
   void removePaper(String arxivId) {
     final nextStatuses = Map<String, String>.from(state.paperStatuses)
       ..remove(arxivId);
+    final nextProgress = Map<String, PaperIndexingProgress>.from(
+      state.paperProgress,
+    )..remove(arxivId);
     emit(state.copyWith(
       selectedPapers:
           state.selectedPapers.where((p) => p.arxivId != arxivId).toList(),
       paperStatuses: nextStatuses,
+      paperProgress: nextProgress,
       error: null,
     ));
   }
@@ -164,11 +183,7 @@ class PaperSelectionCubit extends Cubit<PaperSelectionState> {
           return true;
         },
         (status) {
-          final statusValue =
-              (status['status'] as String? ?? 'processing').toLowerCase();
-          final nextStatuses = Map<String, String>.from(state.paperStatuses)
-            ..[paperId] = statusValue;
-          emit(state.copyWith(paperStatuses: nextStatuses, error: null));
+          final statusValue = _applyStatusPayload(paperId, status);
 
           if (statusValue == 'completed') {
             return true;
@@ -192,9 +207,88 @@ class PaperSelectionCubit extends Cubit<PaperSelectionState> {
   void _markFailure(String paperId, String message) {
     final nextStatuses = Map<String, String>.from(state.paperStatuses)
       ..[paperId] = 'failed';
+    final existing = state.progressFor(paperId);
+    final nextProgress = Map<String, PaperIndexingProgress>.from(
+      state.paperProgress,
+    )..[paperId] = (existing ?? const PaperIndexingProgress()).copyWith(
+        status: 'failed',
+        currentStep: 'failed',
+      );
     emit(state.copyWith(
       paperStatuses: nextStatuses,
+      paperProgress: nextProgress,
       error: message,
     ));
+  }
+
+  Future<void> ensurePdfSize(Paper paper) async {
+    final existingSize =
+        state.progressFor(paper.arxivId)?.pdfSizeBytes ?? paper.pdfSizeBytes;
+    if (existingSize != null || paper.pdfUrl.isEmpty) return;
+    if (!_sizeLookupsInFlight.add(paper.arxivId)) return;
+
+    final result = await _paperRepository.getPdfSize(
+      pdfUrl: paper.pdfUrl,
+      paperId: paper.arxivId,
+    );
+    _sizeLookupsInFlight.remove(paper.arxivId);
+
+    result.fold(
+      (_) => null,
+      (data) {
+        final size = (data['size_bytes'] as num?)?.toInt();
+        if (size != null && size > 0) {
+          _applyPdfSize(paper.arxivId, size);
+        }
+      },
+    );
+  }
+
+  String _applyStatusPayload(String paperId, Map<String, dynamic> status) {
+    final existing = state.progressFor(paperId);
+    final selectedSize = _selectedPaper(paperId)?.pdfSizeBytes;
+    final progress = PaperIndexingProgress.fromStatusJson(
+      status,
+      fallbackPdfSizeBytes: existing?.pdfSizeBytes ?? selectedSize,
+    );
+    _emitProgress(paperId, progress);
+    return progress.status;
+  }
+
+  void _applyPdfSize(String paperId, int size) {
+    final existing = state.progressFor(paperId);
+    final progress = (existing ?? const PaperIndexingProgress()).copyWith(
+      pdfSizeBytes: size,
+    );
+    _emitProgress(paperId, progress);
+  }
+
+  void _emitProgress(String paperId, PaperIndexingProgress progress) {
+    final nextStatuses = Map<String, String>.from(state.paperStatuses)
+      ..[paperId] = progress.status;
+    final nextProgress = Map<String, PaperIndexingProgress>.from(
+      state.paperProgress,
+    )..[paperId] = progress;
+
+    final nextPapers = state.selectedPapers.map((paper) {
+      if (paper.arxivId != paperId || progress.pdfSizeBytes == null) {
+        return paper;
+      }
+      return paper.copyWith(pdfSizeBytes: progress.pdfSizeBytes);
+    }).toList();
+
+    emit(state.copyWith(
+      selectedPapers: nextPapers,
+      paperStatuses: nextStatuses,
+      paperProgress: nextProgress,
+      error: null,
+    ));
+  }
+
+  Paper? _selectedPaper(String paperId) {
+    for (final paper in state.selectedPapers) {
+      if (paper.arxivId == paperId) return paper;
+    }
+    return null;
   }
 }

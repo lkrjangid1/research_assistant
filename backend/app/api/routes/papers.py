@@ -1,13 +1,23 @@
 import logging
+import re
 import time
 from hashlib import sha1
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    UploadFile,
+)
 from fastapi.responses import FileResponse
 from app.models.requests import (
     PaperStatusResponse,
+    PdfSizeResponse,
     ProcessPaperRequest,
     ProcessPaperResponse,
     UploadPaperResponse,
@@ -23,6 +33,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/papers", tags=["Papers"])
 
 _PDF_CACHE_DIR = Path(get_settings().faiss_index_path).parent / "pdf_cache"
+_CONTENT_RANGE_TOTAL_RE = re.compile(r"/(\d+)$")
 
 
 def _pdf_cache_path(paper_id: str) -> Path:
@@ -52,12 +63,73 @@ def _cache_pdf_bytes(paper_id: str, pdf_bytes: bytes) -> None:
     _pdf_cache_path(paper_id).write_bytes(pdf_bytes)
 
 
+def _cached_pdf_size(paper_id: str | None) -> int | None:
+    if not paper_id:
+        return None
+    pdf_path = _pdf_cache_path(paper_id)
+    if not pdf_path.exists():
+        return None
+    return pdf_path.stat().st_size
+
+
+async def _remote_pdf_size(url: str) -> int | None:
+    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+        try:
+            response = await client.head(url)
+            response.raise_for_status()
+            content_length = response.headers.get("content-length")
+            if content_length and content_length.isdigit():
+                return int(content_length)
+        except httpx.HTTPError:
+            logger.info("PDF HEAD size lookup failed for %s; trying range GET", url)
+
+        request = client.build_request("GET", url, headers={"Range": "bytes=0-0"})
+        response = await client.send(request, stream=True)
+        try:
+            response.raise_for_status()
+            content_range = response.headers.get("content-range", "")
+            match = _CONTENT_RANGE_TOTAL_RE.search(content_range)
+            if match:
+                return int(match.group(1))
+
+        finally:
+            await response.aclose()
+    return None
+
+
 def _uploaded_title(filename: str | None, title: str | None) -> str:
     if title and title.strip():
         return title.strip()
     if filename:
         return Path(filename).stem.replace("_", " ").strip() or "Uploaded PDF"
     return "Uploaded PDF"
+
+
+def _set_processing_status(
+    paper_id: str,
+    current_step: str,
+    total_chunks: int = 0,
+    processed_chunks: int = 0,
+    estimated_seconds_remaining: int | None = None,
+    pdf_size_bytes: int | None = None,
+) -> None:
+    previous = get_paper_status_store().get(paper_id)
+    known_pdf_size = (
+        pdf_size_bytes
+        if pdf_size_bytes is not None
+        else previous.pdf_size_bytes
+        if previous
+        else None
+    )
+    set_paper_status(paper_id, PaperStatus(
+        paper_id=paper_id,
+        status=ProcessingStatus.PROCESSING,
+        total_chunks=total_chunks,
+        processed_chunks=processed_chunks,
+        current_step=current_step,
+        estimated_seconds_remaining=estimated_seconds_remaining,
+        pdf_size_bytes=known_pdf_size,
+    ))
 
 
 async def _index_pdf_bytes(
@@ -69,14 +141,19 @@ async def _index_pdf_bytes(
     vector_store,
 ) -> None:
     t0 = time.time()
+    pdf_size_bytes = len(pdf_bytes)
+    _set_processing_status(paper_id, "extracting_text", pdf_size_bytes=pdf_size_bytes)
     doc = await pdf_processor.process_pdf(pdf_bytes, paper_id)
     t1 = time.time()
     logger.info("[%s] Text extracted in %.1fs (%d pages)", paper_id, t1 - t0, len(doc.pages))
 
+    _set_processing_status(paper_id, "chunking", pdf_size_bytes=pdf_size_bytes)
     chunks = chunker.chunk_document(doc.pages, paper_id)
     if not chunks:
         set_paper_status(paper_id, PaperStatus(
             paper_id=paper_id, status=ProcessingStatus.FAILED,
+            current_step="failed",
+            pdf_size_bytes=pdf_size_bytes,
             error_message="No text could be extracted from PDF",
         ))
         return
@@ -84,10 +161,54 @@ async def _index_pdf_bytes(
     logger.info("[%s] Chunked in %.1fs (%d chunks)", paper_id, t2 - t1, len(chunks))
 
     texts = [c.text for c in chunks]
-    embeddings = await embedding_service.embed_texts(texts)
+    seconds_per_embedding = getattr(
+        embedding_service,
+        "estimated_seconds_per_uncached_embedding",
+        0,
+    )
+    estimated_total = int(len(chunks) * seconds_per_embedding)
+    _set_processing_status(
+        paper_id,
+        "embedding",
+        total_chunks=len(chunks),
+        estimated_seconds_remaining=estimated_total,
+        pdf_size_bytes=pdf_size_bytes,
+    )
+    logger.info(
+        "[%s] Embedding %d chunks; current rate limit estimates up to %ds",
+        paper_id, len(chunks), estimated_total,
+    )
+
+    async def _embedding_progress(done: int, total: int) -> None:
+        remaining = max(0, int((total - done) * seconds_per_embedding))
+        _set_processing_status(
+            paper_id,
+            "embedding",
+            total_chunks=len(chunks),
+            processed_chunks=done,
+            estimated_seconds_remaining=remaining,
+            pdf_size_bytes=pdf_size_bytes,
+        )
+        logger.info(
+            "[%s] Embedded %d/%d chunks (ETA ~%ds)",
+            paper_id, done, len(chunks), remaining,
+        )
+
+    embeddings = await embedding_service.embed_texts(
+        texts,
+        progress_callback=_embedding_progress,
+    )
     t3 = time.time()
     logger.info("[%s] Embedded in %.1fs", paper_id, t3 - t2)
 
+    _set_processing_status(
+        paper_id,
+        "indexing",
+        total_chunks=len(chunks),
+        processed_chunks=len(chunks),
+        estimated_seconds_remaining=0,
+        pdf_size_bytes=pdf_size_bytes,
+    )
     chunk_ids = [c.chunk_id for c in chunks]
     metadata = [{"paper_id": c.paper_id, "page_number": c.page_number, "text": c.text} for c in chunks]
     vector_store.add_embeddings(embeddings, chunk_ids, metadata)
@@ -96,7 +217,13 @@ async def _index_pdf_bytes(
     logger.info("[%s] FAISS indexed + saved in %.1fs", paper_id, t4 - t3)
 
     set_paper_status(paper_id, PaperStatus(
-        paper_id=paper_id, status=ProcessingStatus.COMPLETED, total_chunks=len(chunks),
+        paper_id=paper_id,
+        status=ProcessingStatus.COMPLETED,
+        total_chunks=len(chunks),
+        processed_chunks=len(chunks),
+        current_step="completed",
+        estimated_seconds_remaining=0,
+        pdf_size_bytes=pdf_size_bytes,
     ))
     logger.info("[%s] TOTAL: %.1fs (%d chunks)", paper_id, t4 - t0, len(chunks))
 
@@ -112,13 +239,19 @@ async def _process_paper_task(
         # Race-condition guard: another task may have finished first
         if vector_store.has_paper(paper_id):
             set_paper_status(paper_id, PaperStatus(
-                paper_id=paper_id, status=ProcessingStatus.COMPLETED,
+                paper_id=paper_id,
+                status=ProcessingStatus.COMPLETED,
+                current_step="completed",
+                pdf_size_bytes=_cached_pdf_size(paper_id),
             ))
             logger.info("[%s] Already indexed — skipped", paper_id)
             return
 
         pdf_bytes = await _download_pdf(request.pdf_url, paper_id)
-        logger.info("[%s] PDF ready in %.1fs (%d KB)", paper_id, time.time() - t0, len(pdf_bytes) // 1024)
+        logger.info(
+            "[%s] PDF ready in %.1fs (%d KB)",
+            paper_id, time.time() - t0, len(pdf_bytes) // 1024,
+        )
         await _index_pdf_bytes(
             paper_id,
             pdf_bytes,
@@ -131,7 +264,11 @@ async def _process_paper_task(
     except Exception as exc:
         logger.error("Paper processing failed for %s: %s", paper_id, exc)
         set_paper_status(paper_id, PaperStatus(
-            paper_id=paper_id, status=ProcessingStatus.FAILED, error_message=str(exc),
+            paper_id=paper_id,
+            status=ProcessingStatus.FAILED,
+            current_step="failed",
+            pdf_size_bytes=_cached_pdf_size(paper_id),
+            error_message=str(exc),
         ))
 
 
@@ -146,7 +283,10 @@ async def _process_uploaded_paper_task(
     try:
         if vector_store.has_paper(paper_id):
             set_paper_status(paper_id, PaperStatus(
-                paper_id=paper_id, status=ProcessingStatus.COMPLETED,
+                paper_id=paper_id,
+                status=ProcessingStatus.COMPLETED,
+                current_step="completed",
+                pdf_size_bytes=_cached_pdf_size(paper_id),
             ))
             logger.info("[%s] Uploaded PDF already indexed — skipped", paper_id)
             return
@@ -164,7 +304,11 @@ async def _process_uploaded_paper_task(
     except Exception as exc:
         logger.error("Uploaded paper processing failed for %s: %s", paper_id, exc)
         set_paper_status(paper_id, PaperStatus(
-            paper_id=paper_id, status=ProcessingStatus.FAILED, error_message=str(exc),
+            paper_id=paper_id,
+            status=ProcessingStatus.FAILED,
+            current_step="failed",
+            pdf_size_bytes=_cached_pdf_size(paper_id),
+            error_message=str(exc),
         ))
 
 
@@ -179,7 +323,10 @@ async def process_paper(
     vs = get_vector_store()
     if vs.has_paper(paper_id):
         set_paper_status(paper_id, PaperStatus(
-            paper_id=paper_id, status=ProcessingStatus.COMPLETED,
+            paper_id=paper_id,
+            status=ProcessingStatus.COMPLETED,
+            current_step="completed",
+            pdf_size_bytes=_cached_pdf_size(paper_id),
         ))
         return ProcessPaperResponse(
             paper_id=paper_id, status="completed",
@@ -195,7 +342,7 @@ async def process_paper(
             message="Paper is already being processed",
         )
 
-    set_paper_status(paper_id, PaperStatus(paper_id=paper_id, status=ProcessingStatus.PROCESSING))
+    _set_processing_status(paper_id, "queued")
 
     background_tasks.add_task(
         _process_paper_task,
@@ -237,7 +384,10 @@ async def upload_paper(
     vs = get_vector_store()
     if vs.has_paper(paper_id):
         set_paper_status(paper_id, PaperStatus(
-            paper_id=paper_id, status=ProcessingStatus.COMPLETED,
+            paper_id=paper_id,
+            status=ProcessingStatus.COMPLETED,
+            current_step="completed",
+            pdf_size_bytes=len(pdf_bytes),
         ))
         _cache_pdf_bytes(paper_id, pdf_bytes)
         return UploadPaperResponse(
@@ -246,6 +396,7 @@ async def upload_paper(
             pdf_url=pdf_url,
             status="completed",
             message="PDF already indexed",
+            pdf_size_bytes=len(pdf_bytes),
         )
 
     store = get_paper_status_store()
@@ -258,9 +409,10 @@ async def upload_paper(
             pdf_url=pdf_url,
             status="processing",
             message="PDF is already being processed",
+            pdf_size_bytes=len(pdf_bytes),
         )
 
-    set_paper_status(paper_id, PaperStatus(paper_id=paper_id, status=ProcessingStatus.PROCESSING))
+    _set_processing_status(paper_id, "queued")
     background_tasks.add_task(
         _process_uploaded_paper_task,
         paper_id,
@@ -276,6 +428,34 @@ async def upload_paper(
         pdf_url=pdf_url,
         status="processing",
         message="PDF upload received and indexing started",
+        pdf_size_bytes=len(pdf_bytes),
+    )
+
+
+@router.get("/pdf-size", response_model=PdfSizeResponse)
+async def pdf_size(
+    pdf_url: str = Query(..., min_length=1),
+    paper_id: str | None = Query(default=None),
+):
+    cached_size = _cached_pdf_size(paper_id)
+    if cached_size is not None:
+        return PdfSizeResponse(
+            paper_id=paper_id,
+            pdf_url=pdf_url,
+            size_bytes=cached_size,
+            source="cache",
+        )
+
+    try:
+        size = await _remote_pdf_size(pdf_url)
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"PDF size lookup failed: {exc}") from exc
+
+    return PdfSizeResponse(
+        paper_id=paper_id,
+        pdf_url=pdf_url,
+        size_bytes=size,
+        source="remote" if size is not None else "unknown",
     )
 
 
@@ -289,7 +469,12 @@ async def paper_status(paper_id: str):
     if not status:
         vs = get_vector_store()
         if vs.has_paper(paper_id):
-            status = PaperStatus(paper_id=paper_id, status=ProcessingStatus.COMPLETED)
+            status = PaperStatus(
+                paper_id=paper_id,
+                status=ProcessingStatus.COMPLETED,
+                current_step="completed",
+                pdf_size_bytes=_cached_pdf_size(paper_id),
+            )
             store[paper_id] = status
         else:
             raise HTTPException(status_code=404, detail=f"Paper '{paper_id}' not found")
@@ -298,6 +483,10 @@ async def paper_status(paper_id: str):
         paper_id=status.paper_id,
         status=status.status.value,
         total_chunks=status.total_chunks,
+        processed_chunks=status.processed_chunks,
+        current_step=status.current_step,
+        estimated_seconds_remaining=status.estimated_seconds_remaining,
+        pdf_size_bytes=status.pdf_size_bytes,
         error_message=status.error_message,
     )
 

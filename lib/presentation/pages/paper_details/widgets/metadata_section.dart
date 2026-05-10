@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../domain/entities/paper.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../../../../core/utils/file_size_formatter.dart';
 import '../../../../core/theme/colors.dart';
 
 class MetadataSection extends StatelessWidget {
@@ -15,6 +16,7 @@ class MetadataSection extends StatelessWidget {
     final isUploadedPaper = paper.arxivId.startsWith('upload-');
     final hasAuthors = paper.authors.isNotEmpty;
     final hasCategories = paper.categories.isNotEmpty;
+    final sizeLabel = FileSizeFormatter.formatBytes(paper.pdfSizeBytes);
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -72,6 +74,14 @@ class MetadataSection extends StatelessWidget {
                   text: paper.arxivId,
                   cs: cs,
                   isMonospace: true),
+              if (sizeLabel.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _MetaRow(
+                  icon: Icons.picture_as_pdf_outlined,
+                  text: sizeLabel,
+                  cs: cs,
+                ),
+              ],
               const SizedBox(height: 16),
               Row(
                 children: [

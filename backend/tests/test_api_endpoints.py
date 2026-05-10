@@ -89,7 +89,11 @@ def test_upload_paper_pdf_success(
 
     status = test_client.get(f"/api/papers/{paper_id}/status")
     assert status.status_code == 200
-    assert status.json()["status"] == "completed"
+    status_data = status.json()
+    assert status_data["status"] == "completed"
+    assert status_data["processed_chunks"] == status_data["total_chunks"]
+    assert status_data["current_step"] == "completed"
+    assert status_data["pdf_size_bytes"] == len(sample_pdf_bytes)
 
     pdf = test_client.get(f"/api/papers/{paper_id}/pdf")
     assert pdf.status_code == 200
@@ -102,3 +106,26 @@ def test_upload_paper_rejects_non_pdf(test_client):
         files={"file": ("notes.txt", b"not a pdf", "text/plain")},
     )
     assert response.status_code == 400
+
+
+def test_pdf_size_endpoint_uses_remote_lookup(test_client, monkeypatch):
+    from app.api.routes import papers
+
+    async def fake_remote_pdf_size(url):
+        assert url == "https://example.com/paper.pdf"
+        return 123456
+
+    monkeypatch.setattr(papers, "_remote_pdf_size", fake_remote_pdf_size)
+
+    response = test_client.get(
+        "/api/papers/pdf-size",
+        params={
+            "paper_id": "test-paper",
+            "pdf_url": "https://example.com/paper.pdf",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["size_bytes"] == 123456
+    assert data["source"] == "remote"

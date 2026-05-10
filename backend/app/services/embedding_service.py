@@ -4,24 +4,28 @@ import logging
 import pickle
 import re
 import time
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import httpx
 import numpy as np
+from google.auth.credentials import Credentials
 
 from app.core.exceptions import EmbeddingError
+from app.services.vertex_auth import VertexAuth, VertexAuthError
 
 logger = logging.getLogger(__name__)
 
-_BATCH_EMBED_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/{model}:batchEmbedContents"
+_VERTEX_MODEL_PATH = (
+    "projects/{project}/locations/{location}/publishers/google/models/{model}"
 )
-_SINGLE_EMBED_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/{model}:embedContent"
-)
+_VERTEX_PREDICT_URL = "https://{host}/v1/{model}:predict"
 
 _BATCH_SIZE = 100
-_CONCURRENT_LIMIT = 25
+_CONCURRENT_LIMIT = 1
+_REQUESTS_PER_MINUTE = 4
+_MAX_RETRIES = 5
+_MAX_RETRY_DELAY_SECONDS = 60.0
 
 # Only the first _MAX_EMBED_CHARS are sent to the API.
 # Full chunk text stays in FAISS metadata for RAG context.
@@ -37,6 +41,28 @@ _STRIP_PATTERNS = [
 ]
 
 
+class _AsyncRateLimiter:
+    def __init__(self, requests_per_minute: int):
+        self._interval = 60.0 / requests_per_minute if requests_per_minute > 0 else 0.0
+        self._next_at = 0.0
+        self._lock = asyncio.Lock()
+
+    async def wait(self) -> None:
+        if self._interval <= 0:
+            return
+
+        async with self._lock:
+            now = time.monotonic()
+            if now < self._next_at:
+                await asyncio.sleep(self._next_at - now)
+                now = time.monotonic()
+            self._next_at = now + self._interval
+
+    @property
+    def interval(self) -> float:
+        return self._interval
+
+
 def _preprocess(text: str) -> str:
     """Strip low-value tokens before sending to the embedding API."""
     text = text[:_MAX_EMBED_CHARS]
@@ -46,7 +72,7 @@ def _preprocess(text: str) -> str:
 
 
 class EmbeddingService:
-    """Gemini embedding API with persistent cache and token-cost optimisations.
+    """Vertex AI embedding API with persistent cache and token-cost optimisations.
 
     Cost levers applied:
     1. Hash-based persistent cache — same text is NEVER re-embedded
@@ -54,19 +80,31 @@ class EmbeddingService:
     3. Input truncation — first 1024 chars per chunk only
     4. Task types — RETRIEVAL_DOCUMENT/RETRIEVAL_QUERY for better vectors
     5. Reduced output dim — 256 instead of 768
-    6. Batch API — 1 HTTP call per 100 texts
+    6. Bounded concurrency — Vertex predict calls are parallelised per batch
+    7. Request pacing — gemini-embedding-001 accepts one input per request and
+       low default quotas can throttle bursts.
     """
 
     def __init__(
         self,
-        api_key: str,
+        project_id: str = "",
+        location: str = "us-central1",
         model_name: str = "gemini-embedding-001",
         embedding_dim: int = 256,
         cache_path: Path | None = None,
+        credentials: Credentials | None = None,
+        credentials_path: str = "",
+        concurrent_limit: int = _CONCURRENT_LIMIT,
+        requests_per_minute: int = _REQUESTS_PER_MINUTE,
+        max_retries: int = _MAX_RETRIES,
     ):
-        self.api_key = api_key
-        self.model_name = model_name
+        self.location = location.strip() or "us-central1"
+        self.model_name = model_name.strip()
         self.embedding_dim = embedding_dim
+        self._auth = VertexAuth(project_id, credentials, credentials_path)
+        self._concurrent_limit = max(1, concurrent_limit)
+        self._rate_limiter = _AsyncRateLimiter(max(0, requests_per_minute))
+        self._max_retries = max(0, max_retries)
 
         # ── Persistent cache ─────────────────────────────────────────────
         self._cache: dict[str, list[float]] = {}
@@ -105,9 +143,8 @@ class EmbeddingService:
         self,
         texts: list[str],
         task_type: str = "RETRIEVAL_DOCUMENT",
+        progress_callback: Callable[[int, int], Awaitable[None] | None] | None = None,
     ) -> np.ndarray:
-        if not self.api_key:
-            raise EmbeddingError("Embedding failed: GEMINI_API_KEY is not configured.")
         if not texts:
             return np.empty((0, self.embedding_dim), dtype=np.float32)
 
@@ -131,13 +168,23 @@ class EmbeddingService:
                 self._misses += 1
 
         # ── Call API only for uncached texts ─────────────────────────────
+        cached_count = len(texts) - len(uncached_texts)
+        if cached_count:
+            await self._notify_progress(progress_callback, cached_count, len(texts))
+
         if uncached_texts:
             logger.info(
                 "Embedding %d texts (%d cached, %d to embed, dim=%d, task=%s)",
-                len(texts), len(texts) - len(uncached_texts),
+                len(texts), cached_count,
                 len(uncached_texts), self.embedding_dim, task_type,
             )
-            new_vectors = await self._batch_embed_all(uncached_texts, task_type)
+            new_vectors = await self._batch_embed_all(
+                uncached_texts,
+                task_type,
+                progress_callback,
+                completed_offset=cached_count,
+                total=len(texts),
+            )
             for idx, vec in zip(uncached_indices, new_vectors):
                 key = self._cache_key(processed[idx], task_type)
                 self._cache[key] = vec
@@ -162,90 +209,167 @@ class EmbeddingService:
         result = await self.embed_texts([query], task_type="RETRIEVAL_QUERY")
         return result[0]
 
-    # ── Batch API (private) ──────────────────────────────────────────────
+    # ── Vertex Prediction API (private) ──────────────────────────────────
 
     async def _batch_embed_all(
-        self, texts: list[str], task_type: str,
+        self,
+        texts: list[str],
+        task_type: str,
+        progress_callback: Callable[[int, int], Awaitable[None] | None] | None = None,
+        completed_offset: int = 0,
+        total: int | None = None,
     ) -> list[list[float]]:
         all_vectors: list[list[float]] = []
+        total_count = total or len(texts)
         async with httpx.AsyncClient(timeout=120.0) as client:
             for i in range(0, len(texts), _BATCH_SIZE):
                 batch = texts[i : i + _BATCH_SIZE]
                 t_batch = time.time()
                 try:
-                    vecs = await self._embed_batch(client, batch, task_type)
+                    vecs = await self._embed_batch(
+                        client,
+                        batch,
+                        task_type,
+                        completed_offset=completed_offset + len(all_vectors),
+                        total=total_count,
+                        progress_callback=progress_callback,
+                    )
                     all_vectors.extend(vecs)
                     logger.info(
-                        "  Batch %d-%d: %d embeddings in %.1fs",
+                        "  Batch %d-%d: %d Vertex embeddings in %.1fs",
                         i, i + len(batch), len(batch), time.time() - t_batch,
                     )
                 except EmbeddingError as exc:
-                    logger.warning(
-                        "  Batch %d-%d FAILED: %s — concurrent fallback",
-                        i, i + len(batch), exc,
-                    )
-                    vecs = await self._embed_concurrent(client, batch, task_type)
-                    all_vectors.extend(vecs)
+                    logger.warning("  Batch %d-%d FAILED: %s", i, i + len(batch), exc)
+                    raise
         return all_vectors
 
     async def _embed_batch(
-        self, client: httpx.AsyncClient, texts: list[str], task_type: str,
+        self,
+        client: httpx.AsyncClient,
+        texts: list[str],
+        task_type: str,
+        completed_offset: int = 0,
+        total: int | None = None,
+        progress_callback: Callable[[int, int], Awaitable[None] | None] | None = None,
     ) -> list[list[float]]:
-        url = _BATCH_EMBED_URL.format(model=self.model_name)
-        requests = [
-            {
-                "model": f"models/{self.model_name}",
-                "content": {"parts": [{"text": t}]},
-                "taskType": task_type,
-                "outputDimensionality": self.embedding_dim,
-            }
-            for t in texts
-        ]
         try:
-            resp = await client.post(url, params={"key": self.api_key}, json={"requests": requests})
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise EmbeddingError(f"HTTP {exc.response.status_code}: {exc.response.text[:300]}") from exc
-        except httpx.HTTPError as exc:
-            raise EmbeddingError(str(exc)) from exc
+            url = _VERTEX_PREDICT_URL.format(
+                host=self._api_host(),
+                model=await self._model_path(),
+            )
+            headers = await self._auth.headers()
+        except VertexAuthError as exc:
+            raise EmbeddingError(f"Embedding failed: {exc}") from exc
 
-        data = resp.json()
-        try:
-            return [emb["values"] for emb in data["embeddings"]]
-        except (KeyError, TypeError, IndexError) as exc:
-            raise EmbeddingError(f"Unexpected response: {list(data.keys())}") from exc
-
-    async def _embed_concurrent(
-        self, client: httpx.AsyncClient, texts: list[str], task_type: str,
-    ) -> list[list[float]]:
-        sem = asyncio.Semaphore(_CONCURRENT_LIMIT)
+        sem = asyncio.Semaphore(self._concurrent_limit)
+        done = 0
 
         async def _one(text: str) -> list[float]:
+            nonlocal done
             async with sem:
-                return await self._embed_single(client, text, task_type)
+                vector = await self._embed_single(client, url, headers, text, task_type)
+                done += 1
+                await self._notify_progress(
+                    progress_callback,
+                    completed_offset + done,
+                    total or len(texts),
+                )
+                return vector
 
         return list(await asyncio.gather(*[_one(t) for t in texts]))
 
     async def _embed_single(
-        self, client: httpx.AsyncClient, text: str, task_type: str,
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        headers: dict[str, str],
+        text: str,
+        task_type: str,
     ) -> list[float]:
-        url = _SINGLE_EMBED_URL.format(model=self.model_name)
         payload = {
-            "model": f"models/{self.model_name}",
-            "content": {"parts": [{"text": text}]},
-            "taskType": task_type,
-            "outputDimensionality": self.embedding_dim,
+            "instances": [
+                {
+                    "content": text,
+                    "task_type": task_type,
+                }
+            ],
+            "parameters": {
+                "autoTruncate": True,
+                "outputDimensionality": self.embedding_dim,
+            },
         }
-        try:
-            resp = await client.post(url, params={"key": self.api_key}, json=payload)
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise EmbeddingError(f"HTTP {exc.response.status_code}: {exc.response.text[:300]}") from exc
-        except httpx.HTTPError as exc:
-            raise EmbeddingError(f"Embedding failed: {exc}") from exc
+
+        for attempt in range(self._max_retries + 1):
+            try:
+                await self._rate_limiter.wait()
+                resp = await client.post(
+                    url,
+                    headers=headers,
+                    json=payload,
+                )
+                resp.raise_for_status()
+                break
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 429 and attempt < self._max_retries:
+                    delay = self._retry_delay_seconds(exc.response, attempt)
+                    logger.warning(
+                        "Vertex embedding quota throttled; retrying in %.1fs (%d/%d)",
+                        delay, attempt + 1, self._max_retries,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                raise EmbeddingError(f"HTTP {exc.response.status_code}: {exc.response.text[:300]}") from exc
+            except httpx.HTTPError as exc:
+                raise EmbeddingError(f"Embedding failed: {exc}") from exc
 
         data = resp.json()
         try:
-            return data["embedding"]["values"]
-        except (KeyError, TypeError) as exc:
-            raise EmbeddingError("Unexpected response shape") from exc
+            return data["predictions"][0]["embeddings"]["values"]
+        except (KeyError, TypeError, IndexError) as exc:
+            raise EmbeddingError("Unexpected Vertex AI prediction response shape") from exc
+
+    async def _model_path(self) -> str:
+        if self.model_name.startswith("projects/"):
+            return self.model_name
+        project = await self._auth.project()
+        if self.model_name.startswith("publishers/"):
+            return f"projects/{project}/locations/{self.location}/{self.model_name}"
+        return _VERTEX_MODEL_PATH.format(
+            project=project,
+            location=self.location,
+            model=self.model_name,
+        )
+
+    def _api_host(self) -> str:
+        if self.location == "global":
+            return "aiplatform.googleapis.com"
+        return f"{self.location}-aiplatform.googleapis.com"
+
+    def _retry_delay_seconds(self, response: httpx.Response, attempt: int) -> float:
+        retry_after = response.headers.get("retry-after")
+        if retry_after:
+            try:
+                return min(float(retry_after), _MAX_RETRY_DELAY_SECONDS)
+            except ValueError:
+                pass
+
+        base_delay = self._rate_limiter.interval or 2.0
+        return min(base_delay * (2 ** attempt), _MAX_RETRY_DELAY_SECONDS)
+
+    async def _notify_progress(
+        self,
+        progress_callback: Callable[[int, int], Awaitable[None] | None] | None,
+        completed: int,
+        total: int,
+    ) -> None:
+        if not progress_callback:
+            return
+
+        result = progress_callback(completed, total)
+        if result is not None:
+            await result
+
+    @property
+    def estimated_seconds_per_uncached_embedding(self) -> float:
+        return self._rate_limiter.interval

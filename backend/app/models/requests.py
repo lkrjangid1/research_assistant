@@ -23,13 +23,25 @@ class UploadPaperResponse(BaseModel):
     pdf_url: str
     status: str
     message: str
+    pdf_size_bytes: int | None = None
 
 
 class PaperStatusResponse(BaseModel):
     paper_id: str
     status: str
     total_chunks: int = 0
+    processed_chunks: int = 0
+    current_step: str = ""
+    estimated_seconds_remaining: Optional[int] = None
+    pdf_size_bytes: Optional[int] = None
     error_message: Optional[str] = None
+
+
+class PdfSizeResponse(BaseModel):
+    paper_id: Optional[str] = None
+    pdf_url: str
+    size_bytes: Optional[int] = None
+    source: str
 
 
 # ── Chat ───────────────────────────────────────────────────────────────────────

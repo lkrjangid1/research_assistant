@@ -29,7 +29,7 @@ def vector_store(tmp_path):
 def mock_embedding_service():
     svc = AsyncMock()
     svc.embed_texts = AsyncMock(
-        side_effect=lambda texts: np.random.rand(len(texts), 768).astype(np.float32)
+        side_effect=lambda texts, **_: np.random.rand(len(texts), 768).astype(np.float32)
     )
     svc.embed_query = AsyncMock(
         return_value=np.random.rand(768).astype(np.float32)

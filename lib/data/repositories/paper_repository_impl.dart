@@ -101,6 +101,26 @@ class PaperRepositoryImpl implements PaperRepository {
   }
 
   @override
+  Future<Either<Failure, Map<String, dynamic>>> getPdfSize({
+    required String pdfUrl,
+    String? paperId,
+  }) async {
+    try {
+      final result = await _backendApi.getPdfSize(
+        pdfUrl: pdfUrl,
+        paperId: paperId,
+      );
+      return Right(result);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure('Failed to get PDF size: $e'));
+    }
+  }
+
+  @override
   Future<Either<Failure, String>> getSummary({
     required String paperId,
     required String content,

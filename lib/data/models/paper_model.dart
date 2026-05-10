@@ -26,6 +26,9 @@ class PaperModel extends HiveObject {
   @HiveField(6)
   final List<String> categories;
 
+  @HiveField(7)
+  final int? pdfSizeBytes;
+
   PaperModel({
     required this.arxivId,
     required this.title,
@@ -34,6 +37,7 @@ class PaperModel extends HiveObject {
     required this.pdfUrl,
     required this.publishedDate,
     required this.categories,
+    this.pdfSizeBytes,
   });
 
   Paper toEntity() => Paper(
@@ -44,6 +48,7 @@ class PaperModel extends HiveObject {
         pdfUrl: pdfUrl,
         publishedDate: publishedDate,
         categories: categories,
+        pdfSizeBytes: pdfSizeBytes,
       );
 
   factory PaperModel.fromEntity(Paper p) => PaperModel(
@@ -54,5 +59,6 @@ class PaperModel extends HiveObject {
         pdfUrl: p.pdfUrl,
         publishedDate: p.publishedDate,
         categories: p.categories,
+        pdfSizeBytes: p.pdfSizeBytes,
       );
 }

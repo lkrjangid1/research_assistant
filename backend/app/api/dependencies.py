@@ -27,8 +27,10 @@ def get_chunker() -> SemanticChunker:
 def get_vertex_ai_client() -> VertexAIClient:
     settings = get_settings()
     return VertexAIClient(
-        api_key=settings.gemini_api_key,
+        project_id=settings.vertex_project_id,
+        location=settings.vertex_location,
         model_name=settings.gemini_model,
+        credentials_path=settings.google_application_credentials,
     )
 
 
@@ -36,10 +38,15 @@ def get_vertex_ai_client() -> VertexAIClient:
 def get_embedding_service() -> EmbeddingService:
     settings = get_settings()
     return EmbeddingService(
-        api_key=settings.gemini_api_key,
+        project_id=settings.vertex_project_id,
+        location=settings.vertex_location,
         model_name=settings.embedding_model,
         embedding_dim=settings.embedding_dim,
         cache_path=Path(settings.embedding_cache_path),
+        credentials_path=settings.google_application_credentials,
+        concurrent_limit=settings.embedding_concurrent_limit,
+        requests_per_minute=settings.embedding_requests_per_minute,
+        max_retries=settings.embedding_max_retries,
     )
 
 

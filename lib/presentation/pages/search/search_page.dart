@@ -67,6 +67,14 @@ class _SearchViewState extends State<_SearchView> {
                   isLoading: state is SearchLoading,
                   onSearch: (q) => context.read<SearchCubit>().search(q),
                 ),
+                Text(
+                  "*Use less size paper for testing, for faster response",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
                 Expanded(child: _buildBody(context, state)),
                 const PaperSelectionBar(),
               ],

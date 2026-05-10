@@ -6,8 +6,10 @@ import '../../../../domain/entities/paper.dart';
 import '../../../cubits/chat/chat_cubit.dart';
 import '../../../cubits/chat/chat_state.dart';
 import '../../../cubits/paper_selection/paper_selection_cubit.dart';
+import '../../../cubits/paper_selection/paper_selection_state.dart';
 import '../../../../app/routes.dart';
 import '../../../../core/theme/colors.dart';
+import '../../../../core/utils/file_size_formatter.dart';
 
 class ChatPapersPanel extends StatefulWidget {
   const ChatPapersPanel({super.key});
@@ -300,11 +302,13 @@ class _ChatPapersPanelState extends State<ChatPapersPanel>
                     final status = selState.isSelected(p.arxivId)
                         ? selState.statusFor(p.arxivId)
                         : 'completed';
+                    final progress = selState.progressFor(p.arxivId);
                     // Can remove as long as the session has more than one paper
                     final canRemove = papers.length > 1;
                     return _PaperRow(
                       paper: p,
                       status: status,
+                      progress: progress,
                       canRemove: canRemove,
                     );
                   }).toList(),
@@ -372,17 +376,20 @@ class _AttachOptionTile extends StatelessWidget {
 class _PaperRow extends StatelessWidget {
   final Paper paper;
   final String status;
+  final PaperIndexingProgress? progress;
   final bool canRemove;
 
   const _PaperRow({
     required this.paper,
     required this.status,
+    required this.progress,
     required this.canRemove,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final metaLabel = _metaLabel();
 
     return InkWell(
       onTap: () => Navigator.pushNamed(
@@ -418,7 +425,7 @@ class _PaperRow extends StatelessWidget {
                       color: cs.onSurface,
                     ),
                   ),
-                  if (paper.authors.isNotEmpty)
+                  if (paper.authors.isNotEmpty && metaLabel.isEmpty)
                     Text(
                       paper.authors.take(2).join(', ') +
                           (paper.authors.length > 2 ? ' et al.' : ''),
@@ -429,10 +436,20 @@ class _PaperRow extends StatelessWidget {
                         color: cs.onSurfaceVariant,
                       ),
                     ),
+                  if (metaLabel.isNotEmpty)
+                    Text(
+                      metaLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
                 ],
               ),
             ),
-            _StatusBadge(status: status),
+            _StatusBadge(status: status, progress: progress),
             IconButton(
               icon: Icon(
                 Icons.close_rounded,
@@ -472,19 +489,49 @@ class _PaperRow extends StatelessWidget {
       _ => AppColors.textTertiary,
     };
   }
+
+  String _metaLabel() {
+    final parts = <String>[];
+    final sizeLabel = FileSizeFormatter.formatBytes(
+      progress?.pdfSizeBytes ?? paper.pdfSizeBytes,
+    );
+    if (sizeLabel.isNotEmpty) parts.add(sizeLabel);
+
+    if (status == 'processing' && progress != null) {
+      final chunkLabel = progress!.chunkLabel;
+      if (chunkLabel.isNotEmpty) parts.add(chunkLabel);
+      if (progress!.remainingChunks > 0) {
+        parts.add('${progress!.remainingChunks} remaining');
+      }
+      final eta = progress!.etaLabel;
+      if (eta.isNotEmpty) parts.add(eta);
+    } else if (paper.authors.isNotEmpty) {
+      parts.add(
+        paper.authors.take(2).join(', ') +
+            (paper.authors.length > 2 ? ' et al.' : ''),
+      );
+    }
+
+    return parts.join(' · ');
+  }
 }
 
 class _StatusBadge extends StatelessWidget {
   final String status;
-  const _StatusBadge({required this.status});
+  final PaperIndexingProgress? progress;
+  const _StatusBadge({required this.status, required this.progress});
 
   @override
   Widget build(BuildContext context) {
     if (status == 'completed' || status == 'idle') {
       return const SizedBox.shrink();
     }
+    final progressLabel = progress?.chunkLabel ?? '';
     final (label, color) = switch (status) {
-      'processing' => ('Indexing', AppColors.gradientFuchsia),
+      'processing' => (
+          progressLabel.isEmpty ? 'Indexing' : progressLabel,
+          AppColors.gradientFuchsia
+        ),
       'failed' => ('Failed', AppColors.error),
       _ => ('', AppColors.textTertiary),
     };

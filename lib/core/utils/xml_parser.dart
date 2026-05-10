@@ -16,7 +16,8 @@ class ArxivXmlParser {
       final idRaw = _text(entry, 'id') ?? '';
       final arxivId = _extractArxivId(idRaw);
       final title = _text(entry, 'title')?.trim().replaceAll('\n', ' ') ?? '';
-      final abstract = _text(entry, 'summary')?.trim().replaceAll('\n', ' ') ?? '';
+      final abstract =
+          _text(entry, 'summary')?.trim().replaceAll('\n', ' ') ?? '';
 
       // Published date
       final publishedStr = _text(entry, 'published') ?? '';
@@ -56,6 +57,7 @@ class ArxivXmlParser {
         pdfUrl: pdfUrl,
         publishedDate: publishedDate,
         categories: categories,
+        pdfSizeBytes: null,
       );
     } catch (_) {
       return null;
