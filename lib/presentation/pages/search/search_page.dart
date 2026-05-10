@@ -68,7 +68,7 @@ class _SearchViewState extends State<_SearchView> {
                   onSearch: (q) => context.read<SearchCubit>().search(q),
                 ),
                 Text(
-                  "*Use less size paper for testing, for faster response",
+                  "*Use less size paper for testing, and faster response",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
